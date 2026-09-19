@@ -37,9 +37,15 @@ class Device extends Model
         return $this->belongsTo(Stall::class);
     }
 
-    public function readings()
+    public function sensorReadings()
     {
         return $this->hasMany(SensorReading::class);
+    }
+
+    // Alias kept for backward compatibility
+    public function readings()
+    {
+        return $this->sensorReadings();
     }
 
     public function thresholds()

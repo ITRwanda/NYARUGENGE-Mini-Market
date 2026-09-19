@@ -3,10 +3,11 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Alert;
 use App\Models\Device;
 use App\Models\SensorReading;
 use App\Models\Threshold;
-use App\Models\Alert;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +16,7 @@ class SensorReadingController extends Controller
     /**
      * Receive sensor data from ESP8266.
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'device_uid' => 'required|string|exists:devices,device_uid',
@@ -68,7 +69,7 @@ class SensorReadingController extends Controller
     public function deviceReadings(
         Request $request,
         Device $device
-    ) {
+    ): JsonResponse {
         $query = $device->sensorReadings()
             ->latest('recorded_at');
 
@@ -102,7 +103,7 @@ class SensorReadingController extends Controller
     /**
      * Latest reading from every device.
      */
-    public function latest()
+    public function latest(): JsonResponse
     {
         $devices = Device::with([
             'stall',

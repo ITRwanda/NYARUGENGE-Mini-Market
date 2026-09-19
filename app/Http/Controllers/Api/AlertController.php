@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AlertController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Alert::with([
             'device',
@@ -50,7 +51,7 @@ class AlertController extends Controller
         ]);
     }
 
-    public function show(Alert $alert)
+    public function show(Alert $alert): JsonResponse
     {
         return response()->json([
             'success' => true,
@@ -63,7 +64,7 @@ class AlertController extends Controller
         ]);
     }
 
-    public function acknowledge(Alert $alert)
+    public function acknowledge(Alert $alert): JsonResponse
     {
         $alert->update([
             'status' => 'acknowledged',
@@ -78,7 +79,7 @@ class AlertController extends Controller
         ]);
     }
 
-    public function resolve(Alert $alert)
+    public function resolve(Alert $alert): JsonResponse
     {
         $alert->update([
             'status' => 'resolved',

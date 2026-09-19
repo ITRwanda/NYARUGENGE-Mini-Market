@@ -3,15 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\SensorReading;
 use App\Models\Alert;
 use App\Models\Inspection;
+use App\Models\SensorReading;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class ReportController extends Controller
 {
-    public function daily(Request $request)
+    public function daily(Request $request): JsonResponse
     {
         $date = $request->input(
             'date',
@@ -24,7 +25,7 @@ class ReportController extends Controller
         );
     }
 
-    public function weekly(Request $request)
+    public function weekly(Request $request): JsonResponse
     {
         $start = Carbon::now()->startOfWeek();
         $end = Carbon::now()->endOfWeek();
@@ -32,7 +33,7 @@ class ReportController extends Controller
         return $this->generateReport($start, $end);
     }
 
-    public function monthly(Request $request)
+    public function monthly(Request $request): JsonResponse
     {
         $start = Carbon::now()->startOfMonth();
         $end = Carbon::now()->endOfMonth();
@@ -43,7 +44,7 @@ class ReportController extends Controller
     private function generateReport(
         Carbon $start,
         Carbon $end
-    ) {
+    ): JsonResponse {
         $readings = SensorReading::whereBetween(
             'recorded_at',
             [$start, $end]

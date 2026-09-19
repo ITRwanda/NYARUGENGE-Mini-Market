@@ -36,6 +36,7 @@ class AuthController extends Controller
     /**
      * Authenticate user and create access token.
      */
+
     public function login(LoginRequest $request): JsonResponse
     {
         $result = $this->authService->login(

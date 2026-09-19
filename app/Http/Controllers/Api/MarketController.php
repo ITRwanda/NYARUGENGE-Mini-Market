@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Market;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse; // 👈 1. IMPORT THIS FIRST
 
 class MarketController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse // 👈 2. ADD TYPE-HINT HERE
     {
         $markets = Market::withCount([
             'vendors',
@@ -23,7 +24,7 @@ class MarketController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse // 👈 ADD TYPE-HINT HERE
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -43,7 +44,7 @@ class MarketController extends Controller
         ], 201);
     }
 
-    public function show(Market $market)
+    public function show(Market $market): JsonResponse // 👈 ADD TYPE-HINT HERE
     {
         $market->load([
             'vendors',
@@ -57,7 +58,7 @@ class MarketController extends Controller
         ]);
     }
 
-    public function update(Request $request, Market $market)
+    public function update(Request $request, Market $market): JsonResponse // 👈 ADD TYPE-HINT HERE
     {
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
@@ -77,7 +78,7 @@ class MarketController extends Controller
         ]);
     }
 
-    public function destroy(Market $market)
+    public function destroy(Market $market): JsonResponse // 👈 ADD TYPE-HINT HERE
     {
         $market->delete();
 

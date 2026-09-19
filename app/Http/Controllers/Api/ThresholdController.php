@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Threshold;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ThresholdController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Threshold::with([
             'market',
@@ -37,7 +38,7 @@ class ThresholdController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'market_id' => 'required|exists:markets,id',
@@ -68,7 +69,7 @@ class ThresholdController extends Controller
         ], 201);
     }
 
-    public function show(Threshold $threshold)
+    public function show(Threshold $threshold): JsonResponse
     {
         return response()->json([
             'success' => true,
@@ -82,7 +83,7 @@ class ThresholdController extends Controller
     public function update(
         Request $request,
         Threshold $threshold
-    ) {
+    ): JsonResponse {
         $validated = $request->validate([
             'market_id' => 'sometimes|required|exists:markets,id',
             'device_id' => 'nullable|exists:devices,id',
@@ -102,7 +103,7 @@ class ThresholdController extends Controller
         ]);
     }
 
-    public function destroy(Threshold $threshold)
+    public function destroy(Threshold $threshold): JsonResponse
     {
         $threshold->delete();
 

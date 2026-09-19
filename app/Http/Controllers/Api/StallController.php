@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Stall;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class StallController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Stall::with([
             'market',
@@ -34,7 +35,7 @@ class StallController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'market_id' => 'required|exists:markets,id',
@@ -62,7 +63,7 @@ class StallController extends Controller
         ], 201);
     }
 
-    public function show(Stall $stall)
+    public function show(Stall $stall): JsonResponse
     {
         $stall->load([
             'market',
@@ -76,7 +77,7 @@ class StallController extends Controller
         ]);
     }
 
-    public function update(Request $request, Stall $stall)
+    public function update(Request $request, Stall $stall): JsonResponse
     {
         $validated = $request->validate([
             'market_id' => 'sometimes|required|exists:markets,id',
@@ -109,7 +110,7 @@ class StallController extends Controller
         ]);
     }
 
-    public function destroy(Stall $stall)
+    public function destroy(Stall $stall): JsonResponse
     {
         $stall->delete();
 

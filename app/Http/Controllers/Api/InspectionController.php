@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Inspection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class InspectionController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Inspection::with([
             'market',
@@ -44,7 +45,7 @@ class InspectionController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'market_id' => 'required|exists:markets,id',
@@ -82,7 +83,7 @@ class InspectionController extends Controller
         ], 201);
     }
 
-    public function show(Inspection $inspection)
+    public function show(Inspection $inspection): JsonResponse
     {
         return response()->json([
             'success' => true,
@@ -98,7 +99,7 @@ class InspectionController extends Controller
     public function update(
         Request $request,
         Inspection $inspection
-    ) {
+    ): JsonResponse {
         $validated = $request->validate([
             'market_id' => 'sometimes|required|exists:markets,id',
             'stall_id' => 'sometimes|required|exists:stalls,id',
@@ -140,7 +141,7 @@ class InspectionController extends Controller
         ]);
     }
 
-    public function destroy(Inspection $inspection)
+    public function destroy(Inspection $inspection): JsonResponse
     {
         $inspection->delete();
 

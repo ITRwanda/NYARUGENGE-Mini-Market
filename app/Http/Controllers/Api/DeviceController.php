@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DeviceController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Device::with([
             'market',
@@ -36,7 +37,7 @@ class DeviceController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'market_id' => 'required|exists:markets,id',
@@ -62,7 +63,7 @@ class DeviceController extends Controller
         ], 201);
     }
 
-    public function show(Device $device)
+    public function show(Device $device): JsonResponse
     {
         $device->load([
             'market',
@@ -75,7 +76,7 @@ class DeviceController extends Controller
         ]);
     }
 
-    public function update(Request $request, Device $device)
+    public function update(Request $request, Device $device): JsonResponse
     {
         $validated = $request->validate([
             'market_id' => 'sometimes|required|exists:markets,id',
@@ -101,7 +102,7 @@ class DeviceController extends Controller
         ]);
     }
 
-    public function destroy(Device $device)
+    public function destroy(Device $device): JsonResponse
     {
         $device->delete();
 

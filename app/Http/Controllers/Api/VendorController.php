@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vendor;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class VendorController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $query = Vendor::with([
             'user',
@@ -29,7 +30,7 @@ class VendorController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'user_id' => 'nullable|exists:users,id',
@@ -50,7 +51,7 @@ class VendorController extends Controller
         ], 201);
     }
 
-    public function show(Vendor $vendor)
+    public function show(Vendor $vendor): JsonResponse
     {
         $vendor->load([
             'user',
@@ -65,7 +66,7 @@ class VendorController extends Controller
         ]);
     }
 
-    public function update(Request $request, Vendor $vendor)
+    public function update(Request $request, Vendor $vendor): JsonResponse
     {
         $validated = $request->validate([
             'user_id' => 'nullable|exists:users,id',
@@ -86,7 +87,7 @@ class VendorController extends Controller
         ]);
     }
 
-    public function destroy(Vendor $vendor)
+    public function destroy(Vendor $vendor): JsonResponse
     {
         $vendor->delete();
 
