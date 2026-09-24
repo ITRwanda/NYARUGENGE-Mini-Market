@@ -22,6 +22,12 @@ class MarketAdminController extends Controller
      | MARKETS
      *=========================================================================*/
 
+    /** Resolve the single market dynamically — no hardcoded ID */
+    private function getMarket(): \App\Models\Market
+    {
+        return \App\Models\Market::where('is_active', true)->firstOrFail();
+    }
+
     public function markets()
     {
         $markets = Market::withCount(['vendors', 'stalls', 'devices'])
@@ -103,17 +109,18 @@ class MarketAdminController extends Controller
 
     public function createVendor()
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $users   = User::where('role', 'vendor')->orderBy('name')->get();
+        $market = $this->getMarket();
+        $users  = User::where('role', 'vendor')->orderBy('name')->get();
 
-        return view('admin.vendors.create', compact('markets', 'users'));
+        return view('admin.vendors.create', compact('market', 'users'));
     }
 
     public function storeVendor(Request $request)
     {
+        $market = $this->getMarket();
+
         $data = $request->validate([
             'user_id'       => 'nullable|exists:users,id',
-            'market_id'     => 'required|exists:markets,id',
             'vendor_code'   => 'required|string|unique:vendors,vendor_code',
             'business_name' => 'nullable|string|max:255',
             'phone'         => 'nullable|string|max:20',
@@ -121,6 +128,7 @@ class MarketAdminController extends Controller
             'is_active'     => 'boolean',
         ]);
 
+        $data['market_id'] = $market->id;
         $data['is_active'] = $request->boolean('is_active', true);
         Vendor::create($data);
 
@@ -130,17 +138,16 @@ class MarketAdminController extends Controller
 
     public function editVendor(Vendor $vendor)
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $users   = User::where('role', 'vendor')->orderBy('name')->get();
+        $market = $this->getMarket();
+        $users  = User::where('role', 'vendor')->orderBy('name')->get();
 
-        return view('admin.vendors.edit', compact('vendor', 'markets', 'users'));
+        return view('admin.vendors.edit', compact('vendor', 'market', 'users'));
     }
 
     public function updateVendor(Request $request, Vendor $vendor)
     {
         $data = $request->validate([
             'user_id'       => 'nullable|exists:users,id',
-            'market_id'     => 'required|exists:markets,id',
             'business_name' => 'nullable|string|max:255',
             'phone'         => 'nullable|string|max:20',
             'food_category' => 'nullable|string|max:255',
@@ -181,16 +188,20 @@ class MarketAdminController extends Controller
 
     public function createStall()
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $vendors = Vendor::with('market')->where('is_active', true)->orderBy('business_name')->get();
+        $market  = $this->getMarket();
+        $vendors = Vendor::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('business_name')
+            ->get();
 
-        return view('admin.stalls.create', compact('markets', 'vendors'));
+        return view('admin.stalls.create', compact('market', 'vendors'));
     }
 
     public function storeStall(Request $request)
     {
+        $market = $this->getMarket();
+
         $data = $request->validate([
-            'market_id'    => 'required|exists:markets,id',
             'vendor_id'    => 'nullable|exists:vendors,id',
             'stall_number' => 'required|string|max:50',
             'section'      => 'nullable|string|max:100',
@@ -198,6 +209,7 @@ class MarketAdminController extends Controller
             'is_active'    => 'boolean',
         ]);
 
+        $data['market_id'] = $market->id;
         $data['is_active'] = $request->boolean('is_active', true);
         Stall::create($data);
 
@@ -207,16 +219,18 @@ class MarketAdminController extends Controller
 
     public function editStall(Stall $stall)
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $vendors = Vendor::with('market')->where('is_active', true)->orderBy('business_name')->get();
+        $market  = $this->getMarket();
+        $vendors = Vendor::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('business_name')
+            ->get();
 
-        return view('admin.stalls.edit', compact('stall', 'markets', 'vendors'));
+        return view('admin.stalls.edit', compact('stall', 'market', 'vendors'));
     }
 
     public function updateStall(Request $request, Stall $stall)
     {
         $data = $request->validate([
-            'market_id'    => 'required|exists:markets,id',
             'vendor_id'    => 'nullable|exists:vendors,id',
             'stall_number' => 'required|string|max:50',
             'section'      => 'nullable|string|max:100',
@@ -262,16 +276,20 @@ class MarketAdminController extends Controller
 
     public function createDevice()
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $stalls  = Stall::with('market')->where('is_active', true)->orderBy('stall_number')->get();
+        $market = $this->getMarket();
+        $stalls = Stall::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('stall_number')
+            ->get();
 
-        return view('admin.devices.create', compact('markets', 'stalls'));
+        return view('admin.devices.create', compact('market', 'stalls'));
     }
 
     public function storeDevice(Request $request)
     {
+        $market = $this->getMarket();
+
         $data = $request->validate([
-            'market_id'            => 'required|exists:markets,id',
             'stall_id'             => 'nullable|exists:stalls,id',
             'device_uid'           => 'required|string|unique:devices,device_uid',
             'device_name'          => 'nullable|string|max:255',
@@ -285,6 +303,7 @@ class MarketAdminController extends Controller
             'is_active'            => 'boolean',
         ]);
 
+        $data['market_id'] = $market->id;
         $data['is_active'] = $request->boolean('is_active', true);
         Device::create($data);
 
@@ -294,16 +313,18 @@ class MarketAdminController extends Controller
 
     public function editDevice(Device $device)
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $stalls  = Stall::with('market')->where('is_active', true)->orderBy('stall_number')->get();
+        $market = $this->getMarket();
+        $stalls = Stall::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('stall_number')
+            ->get();
 
-        return view('admin.devices.edit', compact('device', 'markets', 'stalls'));
+        return view('admin.devices.edit', compact('device', 'market', 'stalls'));
     }
 
     public function updateDevice(Request $request, Device $device)
     {
         $data = $request->validate([
-            'market_id'            => 'required|exists:markets,id',
             'stall_id'             => 'nullable|exists:stalls,id',
             'device_name'          => 'nullable|string|max:255',
             'microcontroller'      => 'nullable|string|max:100',
@@ -345,16 +366,20 @@ class MarketAdminController extends Controller
 
     public function createThreshold()
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $devices = Device::with('market')->where('is_active', true)->orderBy('device_name')->get();
+        $market  = $this->getMarket();
+        $devices = Device::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('device_name')
+            ->get();
 
-        return view('admin.thresholds.create', compact('markets', 'devices'));
+        return view('admin.thresholds.create', compact('market', 'devices'));
     }
 
     public function storeThreshold(Request $request)
     {
+        $market = $this->getMarket();
+
         $data = $request->validate([
-            'market_id'     => 'required|exists:markets,id',
             'device_id'     => 'nullable|exists:devices,id',
             'parameter'     => 'required|in:temperature,humidity,gas_level',
             'minimum_value' => 'nullable|numeric',
@@ -363,6 +388,7 @@ class MarketAdminController extends Controller
             'is_active'     => 'boolean',
         ]);
 
+        $data['market_id'] = $market->id;
         $data['is_active'] = $request->boolean('is_active', true);
         Threshold::create($data);
 
@@ -372,16 +398,18 @@ class MarketAdminController extends Controller
 
     public function editThreshold(Threshold $threshold)
     {
-        $markets = Market::where('is_active', true)->orderBy('name')->get();
-        $devices = Device::with('market')->where('is_active', true)->orderBy('device_name')->get();
+        $market  = $this->getMarket();
+        $devices = Device::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('device_name')
+            ->get();
 
-        return view('admin.thresholds.edit', compact('threshold', 'markets', 'devices'));
+        return view('admin.thresholds.edit', compact('threshold', 'market', 'devices'));
     }
 
     public function updateThreshold(Request $request, Threshold $threshold)
     {
         $data = $request->validate([
-            'market_id'     => 'required|exists:markets,id',
             'device_id'     => 'nullable|exists:devices,id',
             'parameter'     => 'required|in:temperature,humidity,gas_level',
             'minimum_value' => 'nullable|numeric',
@@ -448,37 +476,52 @@ class MarketAdminController extends Controller
     }
 
     /*==========================================================================
-     | INSPECTIONS
+     | INSPECTIONS — Inspector role ONLY
+     | Admin can VIEW the list (read-only). Only inspectors create/edit/delete.
      *=========================================================================*/
 
     public function inspections()
     {
-        $query = Inspection::with(['market', 'stall', 'inspector', 'items']);
+        $query = Inspection::with(['stall.vendor', 'inspector', 'items']);
 
+        // Inspector only sees their own inspections
         if (auth()->user()->isInspector()) {
             $query->where('inspector_id', auth()->id());
         }
+        // Admin sees all — read only (no create/edit/delete in their view)
 
         $inspections = $query->latest('inspection_date')->paginate(15);
 
         return view('admin.inspections.index', compact('inspections'));
     }
 
+    /** Inspector creates inspection — always assigned to themselves */
     public function createInspection()
     {
-        $markets    = Market::where('is_active', true)->orderBy('name')->get();
-        $stalls     = Stall::with('market')->where('is_active', true)->orderBy('stall_number')->get();
-        $inspectors = User::whereIn('role', ['inspector', 'market_admin', 'admin'])->orderBy('name')->get();
+        // Only inspectors may create
+        if (! auth()->user()->isInspector()) {
+            abort(403, 'Only inspectors can create inspections.');
+        }
 
-        return view('admin.inspections.create', compact('markets', 'stalls', 'inspectors'));
+        $market = $this->getMarket();
+        $stalls = Stall::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('stall_number')
+            ->get();
+
+        return view('admin.inspections.create', compact('stalls', 'market'));
     }
 
     public function storeInspection(Request $request)
     {
+        if (! auth()->user()->isInspector()) {
+            abort(403, 'Only inspectors can create inspections.');
+        }
+
+        $market = $this->getMarket();
+
         $validated = $request->validate([
-            'market_id'       => 'required|exists:markets,id',
             'stall_id'        => 'required|exists:stalls,id',
-            'inspector_id'    => 'required|exists:users,id',
             'inspection_date' => 'required|date',
             'status'          => 'required|in:pending,completed,follow_up',
             'general_notes'   => 'nullable|string',
@@ -488,10 +531,15 @@ class MarketAdminController extends Controller
             'items.*.notes'   => 'nullable|string',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        DB::transaction(function () use ($validated, $market) {
             $items = $validated['items'] ?? [];
             unset($validated['items']);
-            $inspection = Inspection::create($validated);
+
+            $inspection = Inspection::create(array_merge($validated, [
+                'market_id'    => $market->id,
+                'inspector_id' => auth()->id(), // always the logged-in inspector
+            ]));
+
             foreach ($items as $item) {
                 $inspection->items()->create($item);
             }
@@ -503,27 +551,48 @@ class MarketAdminController extends Controller
 
     public function showInspection(Inspection $inspection)
     {
-        $inspection->load(['market', 'stall', 'inspector', 'items']);
+        // Inspector can only view their own
+        if (auth()->user()->isInspector() && $inspection->inspector_id !== auth()->id()) {
+            abort(403);
+        }
+
+        $inspection->load(['stall.vendor', 'inspector', 'items']);
 
         return view('admin.inspections.show', compact('inspection'));
     }
 
     public function editInspection(Inspection $inspection)
     {
-        $markets    = Market::where('is_active', true)->orderBy('name')->get();
-        $stalls     = Stall::with('market')->where('is_active', true)->orderBy('stall_number')->get();
-        $inspectors = User::whereIn('role', ['inspector', 'market_admin', 'admin'])->orderBy('name')->get();
+        if (! auth()->user()->isInspector()) {
+            abort(403, 'Only inspectors can edit inspections.');
+        }
+
+        if ($inspection->inspector_id !== auth()->id()) {
+            abort(403, 'You can only edit your own inspections.');
+        }
+
+        $market = $this->getMarket();
+        $stalls = Stall::where('market_id', $market->id)
+            ->where('is_active', true)
+            ->orderBy('stall_number')
+            ->get();
         $inspection->load('items');
 
-        return view('admin.inspections.edit', compact('inspection', 'markets', 'stalls', 'inspectors'));
+        return view('admin.inspections.edit', compact('inspection', 'stalls', 'market'));
     }
 
     public function updateInspection(Request $request, Inspection $inspection)
     {
+        if (! auth()->user()->isInspector()) {
+            abort(403, 'Only inspectors can update inspections.');
+        }
+
+        if ($inspection->inspector_id !== auth()->id()) {
+            abort(403, 'You can only edit your own inspections.');
+        }
+
         $validated = $request->validate([
-            'market_id'       => 'required|exists:markets,id',
             'stall_id'        => 'required|exists:stalls,id',
-            'inspector_id'    => 'required|exists:users,id',
             'inspection_date' => 'required|date',
             'status'          => 'required|in:pending,completed,follow_up',
             'general_notes'   => 'nullable|string',
@@ -537,6 +606,7 @@ class MarketAdminController extends Controller
             $items = $validated['items'] ?? null;
             unset($validated['items']);
             $inspection->update($validated);
+
             if ($items !== null) {
                 $inspection->items()->delete();
                 foreach ($items as $item) {
@@ -551,6 +621,14 @@ class MarketAdminController extends Controller
 
     public function destroyInspection(Inspection $inspection)
     {
+        if (! auth()->user()->isInspector()) {
+            abort(403, 'Only inspectors can delete inspections.');
+        }
+
+        if ($inspection->inspector_id !== auth()->id()) {
+            abort(403, 'You can only delete your own inspections.');
+        }
+
         $inspection->delete();
 
         return redirect()->route('admin.inspections')
@@ -572,26 +650,39 @@ class MarketAdminController extends Controller
     }
 
     /*==========================================================================
-     | VENDOR PORTAL
+     | VENDOR PORTAL — one vendor, potentially many stalls
      *=========================================================================*/
 
     public function myStall()
     {
         $vendor = auth()->user()->vendor?->load([
             'market',
-            'stalls.devices.sensorReadings' => function ($q) {
-                $q->latest('recorded_at')->limit(1);
-            },
+            'stalls.devices',
         ]);
+
+        if (! $vendor) {
+            return view('admin.vendor.no-profile');
+        }
+
+        // Load latest 1 reading per device for all the vendor's stalls
+        $vendor->stalls->each(function ($stall) {
+            $stall->devices->each(function ($device) {
+                $device->setRelation(
+                    'latestReading',
+                    $device->sensorReadings()->latest('recorded_at')->first()
+                );
+            });
+        });
 
         return view('admin.vendor.my-stall', compact('vendor'));
     }
 
     public function myAlerts()
     {
-        $vendor    = auth()->user()->vendor;
-        $stallIds  = $vendor?->stalls->pluck('id') ?? collect();
-        $alerts    = Alert::with(['device', 'stall'])
+        $vendor   = auth()->user()->vendor;
+        $stallIds = $vendor?->stalls->pluck('id') ?? collect();
+
+        $alerts = Alert::with(['device', 'stall'])
             ->whereIn('stall_id', $stallIds)
             ->latest()
             ->paginate(20);
@@ -603,11 +694,42 @@ class MarketAdminController extends Controller
     {
         $vendor   = auth()->user()->vendor;
         $stallIds = $vendor?->stalls->pluck('id') ?? collect();
+
         $readings = SensorReading::with(['device', 'stall'])
             ->whereIn('stall_id', $stallIds)
             ->latest('recorded_at')
             ->paginate(25);
 
         return view('admin.vendor.my-readings', compact('readings', 'vendor'));
+    }
+
+    /** Vendor sees inspection results for their own stalls */
+    public function myInspections()
+    {
+        $vendor   = auth()->user()->vendor?->load('stalls');
+        $stallIds = $vendor?->stalls->pluck('id') ?? collect();
+
+        $inspections = Inspection::with(['stall', 'inspector', 'items'])
+            ->whereIn('stall_id', $stallIds)
+            ->latest('inspection_date')
+            ->paginate(15);
+
+        return view('admin.vendor.my-inspections', compact('inspections', 'vendor'));
+    }
+
+    /** Single inspection detail for vendor */
+    public function myInspectionShow(Inspection $inspection)
+    {
+        $vendor   = auth()->user()->vendor?->load('stalls');
+        $stallIds = $vendor?->stalls->pluck('id') ?? collect();
+
+        // Vendor can only view inspections on their stalls
+        if (! $stallIds->contains($inspection->stall_id)) {
+            abort(403);
+        }
+
+        $inspection->load(['stall.vendor', 'inspector', 'items']);
+
+        return view('admin.vendor.my-inspection-show', compact('inspection', 'vendor'));
     }
 }

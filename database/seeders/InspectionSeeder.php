@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Inspection;
 use App\Models\InspectionItem;
+use App\Models\Market;
 use App\Models\Stall;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -15,81 +16,76 @@ class InspectionSeeder extends Seeder
         'Food storage temperature within safe range',
         'Proper food labeling and date markings',
         'Absence of pests or rodents',
-        'Clean and sanitized surfaces',
-        'Proper waste disposal',
+        'Clean and sanitized work surfaces',
+        'Proper waste disposal in place',
         'Vendor personal hygiene compliance',
-        'Food separation (raw and cooked)',
+        'Raw and cooked food properly separated',
         'Adequate ventilation in stall',
-        'Fire safety equipment present',
-        'Valid health permit displayed',
+        'Fire safety equipment present and accessible',
+        'Valid health permit visibly displayed',
     ];
 
     public function run(): void
     {
+        $market     = Market::where('name', 'like', '%Nyarugenge%')->firstOrFail();
         $inspectors = User::where('role', 'inspector')->get();
-        $stalls     = Stall::all();
-        $statuses   = ['completed', 'completed', 'completed', 'pending', 'follow_up'];
+        $stalls     = Stall::where('market_id', $market->id)->get();
 
-        foreach ($stalls as $sIndex => $stall) {
-            $inspector = $inspectors[$sIndex % $inspectors->count()];
+        if ($inspectors->isEmpty()) {
+            return;
+        }
 
-            // Create 2-3 inspections per stall over the last 30 days
-            $numInspections = rand(2, 3);
+        foreach ($stalls as $sIdx => $stall) {
+            $inspector = $inspectors[$sIdx % $inspectors->count()];
 
-            for ($i = 0; $i < $numInspections; $i++) {
-                $daysAgo = rand(1, 30);
-                $status  = $statuses[($sIndex + $i) % count($statuses)];
+            // 2 inspections per stall, spread over last 30 days
+            for ($round = 0; $round < 2; $round++) {
+                $daysAgo = rand(1 + ($round * 10), 10 + ($round * 10));
+                $status  = $round === 0 ? 'completed' : ['completed', 'follow_up', 'pending'][rand(0, 2)];
 
                 $inspection = Inspection::create([
-                    'market_id'       => $stall->market_id,
+                    'market_id'       => $market->id,
                     'stall_id'        => $stall->id,
                     'inspector_id'    => $inspector->id,
                     'inspection_date' => Carbon::now()->subDays($daysAgo),
                     'status'          => $status,
-                    'general_notes'   => $this->getGeneralNotes($status),
+                    'general_notes'   => $this->notes($status),
                 ]);
 
-                // Add checklist items
                 foreach ($this->checklistItems as $itemText) {
-                    $itemStatus = $this->getItemStatus($status);
+                    $itemStatus = $this->itemStatus($status);
                     InspectionItem::create([
                         'inspection_id' => $inspection->id,
                         'item'          => $itemText,
                         'status'        => $itemStatus,
-                        'notes'         => $itemStatus === 'fail' ? 'Requires immediate attention and correction.' : null,
+                        'notes'         => $itemStatus === 'fail'
+                            ? 'Requires immediate correction before next market day.'
+                            : null,
                     ]);
                 }
             }
         }
     }
 
-    private function getGeneralNotes(string $status): string
+    private function notes(string $status): string
     {
         return match ($status) {
-            'completed'  => 'Inspection completed successfully. All critical items passed.',
-            'pending'    => 'Scheduled inspection pending vendor availability.',
-            'follow_up'  => 'Follow-up required for items flagged in previous inspection.',
-            default      => 'Routine inspection conducted.',
+            'completed'  => 'Routine inspection completed. Stall meets hygiene standards.',
+            'follow_up'  => 'Follow-up required. Issues were identified and vendor was notified.',
+            'pending'    => 'Inspection scheduled but not yet conducted.',
+            default      => 'Inspection on record.',
         };
     }
 
-    private function getItemStatus(string $inspectionStatus): string
+    private function itemStatus(string $inspectionStatus): string
     {
-        if ($inspectionStatus === 'completed') {
-            $rand = rand(1, 10);
-            if ($rand <= 7) return 'pass';
-            if ($rand <= 9) return 'fail';
+        if ($inspectionStatus === 'pending') {
             return 'not_applicable';
         }
-
+        $roll = rand(1, 10);
         if ($inspectionStatus === 'follow_up') {
-            $rand = rand(1, 10);
-            if ($rand <= 5) return 'pass';
-            if ($rand <= 8) return 'fail';
-            return 'not_applicable';
+            return $roll <= 5 ? 'pass' : ($roll <= 8 ? 'fail' : 'not_applicable');
         }
-
-        // pending
-        return 'not_applicable';
+        return $roll <= 8 ? 'pass' : ($roll <= 9 ? 'fail' : 'not_applicable');
     }
 }

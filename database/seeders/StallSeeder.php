@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Market;
 use App\Models\Stall;
 use App\Models\Vendor;
 use Illuminate\Database\Seeder;
@@ -10,41 +11,52 @@ class StallSeeder extends Seeder
 {
     public function run(): void
     {
-        // Nyarugenge Main Market - 8 stalls
-        $this->createStallsForMarket(1, 8, ['A', 'B']);
-        // Kimironko Market - 6 stalls
-        $this->createStallsForMarket(2, 6, ['C', 'D']);
-        // Nyabugogo Market - 4 stalls
-        $this->createStallsForMarket(3, 4, ['E']);
+        $market = Market::where('name', 'like', '%Nyarugenge%')->firstOrFail();
 
-        // Assign vendors to stalls
-        $vendors = Vendor::all();
-        $stalls  = Stall::all();
+        $vendors = Vendor::where('market_id', $market->id)
+            ->orderBy('id')
+            ->get()
+            ->keyBy('vendor_code');
 
-        foreach ($vendors as $index => $vendor) {
-            $stall = $stalls->where('market_id', $vendor->market_id)
-                ->whereNull('vendor_id')
-                ->first();
+        /*
+         * Stall layout — vendors can occupy multiple stalls
+         *
+         * VND-0001  Nyirabeza Fresh Produce     → 3 stalls (A, B, C)
+         * VND-0002  Ndayishimiye Meat Shop       → 2 stalls (A, B)
+         * VND-0003  Uwase Dairy Corner           → 1 stall  (B)
+         * VND-0004  Hakizimana Fish Market       → 2 stalls (C, D)
+         * VND-0005  Mukansanga Grain Store       → 1 stall  (D)
+         * VND-0006  Nkurunziza Spice Hub         → 1 stall  (A)
+         * VND-0007  Ingabire Bakery              → 2 stalls (C, D)
+         * VND-0008  Niyomugabo General Store     → 1 stall  (B)
+         *
+         * Total: 13 stalls
+         */
+        $stallDefs = [
+            ['number' => 'S-001', 'section' => 'Section A', 'vendor' => 'VND-0001', 'description' => 'Main vegetable display — fresh produce'],
+            ['number' => 'S-002', 'section' => 'Section A', 'vendor' => 'VND-0001', 'description' => 'Fruit stand — seasonal fruits'],
+            ['number' => 'S-003', 'section' => 'Section B', 'vendor' => 'VND-0001', 'description' => 'Overflow produce storage'],
+            ['number' => 'S-004', 'section' => 'Section A', 'vendor' => 'VND-0002', 'description' => 'Primary butchery counter'],
+            ['number' => 'S-005', 'section' => 'Section B', 'vendor' => 'VND-0002', 'description' => 'Poultry display and cold storage'],
+            ['number' => 'S-006', 'section' => 'Section B', 'vendor' => 'VND-0003', 'description' => 'Dairy products — milk, cheese, yoghurt'],
+            ['number' => 'S-007', 'section' => 'Section C', 'vendor' => 'VND-0004', 'description' => 'Fresh fish display'],
+            ['number' => 'S-008', 'section' => 'Section D', 'vendor' => 'VND-0004', 'description' => 'Smoked and dried fish'],
+            ['number' => 'S-009', 'section' => 'Section D', 'vendor' => 'VND-0005', 'description' => 'Grains, rice, beans and cereals'],
+            ['number' => 'S-010', 'section' => 'Section A', 'vendor' => 'VND-0006', 'description' => 'Spices, herbs and condiments'],
+            ['number' => 'S-011', 'section' => 'Section C', 'vendor' => 'VND-0007', 'description' => 'Bakery — bread and rolls'],
+            ['number' => 'S-012', 'section' => 'Section D', 'vendor' => 'VND-0007', 'description' => 'Pastry and confectionery'],
+            ['number' => 'S-013', 'section' => 'Section B', 'vendor' => 'VND-0008', 'description' => 'General goods and household items'],
+        ];
 
-            if ($stall) {
-                $stall->update(['vendor_id' => $vendor->id]);
-            }
-        }
-    }
+        foreach ($stallDefs as $def) {
+            $vendor = $vendors[$def['vendor']] ?? null;
 
-    private function createStallsForMarket(
-        int $marketId,
-        int $count,
-        array $sections
-    ): void {
-        for ($i = 1; $i <= $count; $i++) {
-            $section = $sections[($i - 1) % count($sections)];
             Stall::create([
-                'market_id'    => $marketId,
-                'vendor_id'    => null,
-                'stall_number' => 'S-' . str_pad($i, 3, '0', STR_PAD_LEFT),
-                'section'      => 'Section ' . $section,
-                'description'  => 'Stall ' . $i . ' in section ' . $section,
+                'market_id'    => $market->id,
+                'vendor_id'    => $vendor?->id,
+                'stall_number' => $def['number'],
+                'section'      => $def['section'],
+                'description'  => $def['description'],
                 'is_active'    => true,
             ]);
         }

@@ -13,12 +13,17 @@ class User extends Authenticatable
     use HasFactory;
     use Notifiable;
 
+    /**
+     * Roles: admin, inspector, vendor
+     * (Nyarugenge Mini Market — single-market system)
+     */
     protected $fillable = [
         'name',
         'email',
         'phone',
         'password',
         'role',
+        'is_locked',
     ];
 
     protected $hidden = [
@@ -30,15 +35,10 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password'          => 'hashed',
+            'is_locked'         => 'boolean',
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Relationships
-    |--------------------------------------------------------------------------
-    */
 
     public function vendor()
     {
@@ -47,42 +47,31 @@ class User extends Authenticatable
 
     public function inspections()
     {
-        return $this->hasMany(
-            Inspection::class,
-            'inspector_id'
-        );
+        return $this->hasMany(Inspection::class, 'inspector_id');
+    }
+
+    /** Stalls this inspector is assigned to monitor */
+    public function assignedStalls()
+    {
+        return $this->belongsToMany(Stall::class, 'inspector_stall', 'user_id', 'stall_id')
+                    ->withTimestamps();
     }
 
     public function acknowledgedAlerts()
     {
-        return $this->hasMany(
-            Alert::class,
-            'acknowledged_by'
-        );
+        return $this->hasMany(Alert::class, 'acknowledged_by');
     }
 
     public function resolvedAlerts()
     {
-        return $this->hasMany(
-            Alert::class,
-            'resolved_by'
-        );
+        return $this->hasMany(Alert::class, 'resolved_by');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | Role Helpers
-    |--------------------------------------------------------------------------
-    */
+    /* ── Role helpers ─────────────────────────────────────────── */
 
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
-    }
-
-    public function isMarketAdmin(): bool
-    {
-        return $this->role === 'market_admin';
     }
 
     public function isInspector(): bool
@@ -93,5 +82,11 @@ class User extends Authenticatable
     public function isVendor(): bool
     {
         return $this->role === 'vendor';
+    }
+
+    /** Admin can do everything market_admin could */
+    public function isMarketAdmin(): bool
+    {
+        return $this->role === 'admin';
     }
 }

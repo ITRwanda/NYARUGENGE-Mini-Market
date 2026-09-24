@@ -1,16 +1,17 @@
 @extends('admin.layouts.app')
-@section('title', 'Inspections')
-@section('subtitle', 'Hygiene compliance inspection records')
+@section('title', auth()->user()->isAdmin() ? 'Inspections (Read-Only)' : 'My Inspections')
+@section('subtitle', auth()->user()->isAdmin() ? 'View all inspection records' : 'Inspections you have conducted')
 
 @section('content')
 
 @php
-    $completedCount = \App\Models\Inspection::where('status','completed')->count();
-    $pendingCount   = \App\Models\Inspection::where('status','pending')->count();
-    $followUpCount  = \App\Models\Inspection::where('status','follow_up')->count();
+    $isAdmin        = auth()->user()->isAdmin();
+    $completedCount = \App\Models\Inspection::when(!$isAdmin, fn($q) => $q->where('inspector_id', auth()->id()))->where('status','completed')->count();
+    $pendingCount   = \App\Models\Inspection::when(!$isAdmin, fn($q) => $q->where('inspector_id', auth()->id()))->where('status','pending')->count();
+    $followUpCount  = \App\Models\Inspection::when(!$isAdmin, fn($q) => $q->where('inspector_id', auth()->id()))->where('status','follow_up')->count();
 @endphp
 
-<div class="grid grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-3 gap-4 mb-5">
     <div class="bg-green-50 rounded-2xl p-4 border border-green-100 text-center">
         <p class="text-2xl font-bold text-green-700">{{ $completedCount }}</p>
         <p class="text-xs text-green-600 font-medium mt-0.5">Completed</p>
@@ -25,11 +26,19 @@
     </div>
 </div>
 
+@if(!$isAdmin)
+{{-- Inspectors can create new inspections --}}
 <div class="flex justify-end mb-4">
     <a href="{{ route('admin.inspections.create') }}" class="btn-primary">
         <i data-feather="plus" class="w-4 h-4"></i>New Inspection
     </a>
 </div>
+@else
+<div class="mb-4 p-3.5 bg-blue-50 border border-blue-100 rounded-xl text-sm text-blue-700 flex items-center gap-2">
+    <i data-feather="info" class="w-4 h-4 shrink-0 text-blue-500"></i>
+    You are viewing all inspection records. Only inspectors can create, edit, or delete inspections.
+</div>
+@endif
 
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
     <div class="overflow-x-auto">
@@ -37,8 +46,8 @@
             <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Market</th>
                     <th>Stall</th>
+                    <th>Vendor</th>
                     <th>Inspector</th>
                     <th>Items</th>
                     <th>Pass Rate</th>
@@ -53,62 +62,71 @@
                     $passed   = $inspection->items->where('status','pass')->count();
                     $failed   = $inspection->items->where('status','fail')->count();
                     $passRate = $total > 0 ? round(($passed/$total)*100) : 0;
+                    $isOwner  = $inspection->inspector_id === auth()->id();
                 @endphp
                 <tr>
                     <td class="whitespace-nowrap">
                         <p class="font-semibold text-gray-900 text-sm">{{ $inspection->inspection_date->format('M d, Y') }}</p>
                         <p class="text-xs text-gray-400">{{ $inspection->inspection_date->format('H:i') }}</p>
                     </td>
-                    <td class="font-medium text-gray-700 text-sm">{{ $inspection->market?->name ?? '—' }}</td>
                     <td>
-                        <span class="font-bold text-green-800 bg-green-50 px-2 py-0.5 rounded-xl text-xs">
+                        <span class="font-bold text-green-800 bg-green-50 px-2.5 py-0.5 rounded-xl text-xs">
                             {{ $inspection->stall?->stall_number ?? '—' }}
                         </span>
                     </td>
+                    <td class="text-sm text-gray-700">
+                        {{ $inspection->stall?->vendor?->business_name ?? '—' }}
+                    </td>
                     <td>
                         <div class="flex items-center gap-2">
-                            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center text-xs font-bold text-blue-700 shrink-0">
+                            <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center
+                                        text-xs font-bold text-blue-700 shrink-0">
                                 {{ strtoupper(substr($inspection->inspector?->name ?? 'I', 0, 1)) }}
                             </div>
-                            <span class="text-sm text-gray-700 truncate max-w-[100px]">{{ $inspection->inspector?->name ?? '—' }}</span>
+                            <span class="text-sm text-gray-700 truncate max-w-[100px]">
+                                {{ $inspection->inspector?->name ?? '—' }}
+                            </span>
                         </div>
                     </td>
-                    <td class="text-sm text-gray-700">
+                    <td class="text-sm">
                         <span class="text-green-600 font-semibold">{{ $passed }}✓</span>
-                        @if($failed > 0) <span class="text-red-500 font-semibold ml-1">{{ $failed }}✗</span> @endif
+                        @if($failed > 0)<span class="text-red-500 font-semibold ml-1">{{ $failed }}✗</span>@endif
                         <span class="text-gray-400"> / {{ $total }}</span>
                     </td>
                     <td>
                         @if($total > 0)
                         <div class="flex items-center gap-2">
-                            <div class="w-16 h-1.5 bg-gray-100 rounded-full">
-                                <div class="h-1.5 rounded-full {{ $passRate >= 80 ? 'bg-green-500' : ($passRate >= 60 ? 'bg-yellow-500' : 'bg-red-500') }}"
+                            <div class="w-14 h-1.5 bg-gray-100 rounded-full">
+                                <div class="h-1.5 rounded-full {{ $passRate>=80?'bg-green-500':($passRate>=60?'bg-yellow-500':'bg-red-500') }}"
                                      style="width:{{ $passRate }}%"></div>
                             </div>
-                            <span class="text-xs font-bold {{ $passRate >= 80 ? 'text-green-600' : ($passRate >= 60 ? 'text-yellow-600' : 'text-red-500') }}">
+                            <span class="text-xs font-bold {{ $passRate>=80?'text-green-600':($passRate>=60?'text-yellow-600':'text-red-500') }}">
                                 {{ $passRate }}%
                             </span>
                         </div>
-                        @else
-                            <span class="text-gray-300 text-xs">N/A</span>
-                        @endif
+                        @else <span class="text-gray-300 text-xs">N/A</span> @endif
                     </td>
                     <td>
-                        @if($inspection->status === 'completed') <span class="badge badge-green">✅ Completed</span>
-                        @elseif($inspection->status === 'pending') <span class="badge badge-yellow">⏳ Pending</span>
-                        @else <span class="badge badge-orange">🔄 Follow-up</span>
-                        @endif
+                        @if($inspection->status==='completed')  <span class="badge badge-green">✅ Completed</span>
+                        @elseif($inspection->status==='pending') <span class="badge badge-yellow">⏳ Pending</span>
+                        @else <span class="badge badge-orange">🔄 Follow-up</span> @endif
                     </td>
                     <td class="text-right pr-4">
                         <div class="flex items-center justify-end gap-1.5">
+                            {{-- Both admin and inspector can view --}}
                             <a href="{{ route('admin.inspections.show', $inspection) }}"
-                               class="text-xs text-gray-600 hover:text-gray-900 font-medium px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                               class="text-xs text-gray-600 hover:text-gray-900 font-medium
+                                      px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors">
                                 View
                             </a>
+                            {{-- Only the owning inspector can edit --}}
+                            @if(!$isAdmin && $isOwner)
                             <a href="{{ route('admin.inspections.edit', $inspection) }}"
-                               class="text-xs text-blue-600 hover:text-blue-800 font-medium px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
+                               class="text-xs text-blue-600 hover:text-blue-800 font-medium
+                                      px-2.5 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
                                 Edit
                             </a>
+                            @endif
                         </div>
                     </td>
                 </tr>
@@ -116,10 +134,12 @@
                 <tr>
                     <td colspan="8" class="text-center py-12 text-gray-400">
                         <i data-feather="clipboard" class="w-8 h-8 mx-auto mb-2"></i>
-                        <p class="mb-3">No inspections found.</p>
+                        <p class="mb-3">{{ $isAdmin ? 'No inspections have been recorded yet.' : 'You have no inspections yet.' }}</p>
+                        @if(!$isAdmin)
                         <a href="{{ route('admin.inspections.create') }}" class="btn-primary inline-flex">
                             <i data-feather="plus" class="w-4 h-4"></i>Create First Inspection
                         </a>
+                        @endif
                     </td>
                 </tr>
                 @endforelse
@@ -127,7 +147,7 @@
         </table>
     </div>
     <div class="px-6 py-4 border-t border-gray-100 flex flex-wrap justify-between items-center gap-3">
-        <p class="text-sm text-gray-500">{{ $inspections->total() }} total inspections</p>
+        <p class="text-sm text-gray-500">{{ $inspections->total() }} total</p>
         {{ $inspections->links() }}
     </div>
 </div>

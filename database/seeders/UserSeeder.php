@@ -10,36 +10,19 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-        // Super Admin
+        // ── Admin ────────────────────────────────────────────────
         User::create([
             'name'     => 'Admin Nyarugenge',
-            'email'    => 'admin@market.rw',
+            'email'    => 'admin@nyarugenge.rw',
             'phone'    => '+250788000001',
             'password' => Hash::make('password'),
             'role'     => 'admin',
         ]);
 
-        // Market Admins
-        User::create([
-            'name'     => 'Jean-Pierre Habimana',
-            'email'    => 'jp.habimana@market.rw',
-            'phone'    => '+250788000002',
-            'password' => Hash::make('password'),
-            'role'     => 'market_admin',
-        ]);
-
-        User::create([
-            'name'     => 'Claudine Uwimana',
-            'email'    => 'c.uwimana@market.rw',
-            'phone'    => '+250788000003',
-            'password' => Hash::make('password'),
-            'role'     => 'market_admin',
-        ]);
-
-        // Inspectors
+        // ── Inspectors ───────────────────────────────────────────
         User::create([
             'name'     => 'Patrick Nzeyimana',
-            'email'    => 'p.nzeyimana@market.rw',
+            'email'    => 'patrick@nyarugenge.rw',
             'phone'    => '+250788000010',
             'password' => Hash::make('password'),
             'role'     => 'inspector',
@@ -47,37 +30,25 @@ class UserSeeder extends Seeder
 
         User::create([
             'name'     => 'Angelique Mukamana',
-            'email'    => 'a.mukamana@market.rw',
+            'email'    => 'angelique@nyarugenge.rw',
             'phone'    => '+250788000011',
             'password' => Hash::make('password'),
             'role'     => 'inspector',
         ]);
 
-        User::create([
-            'name'     => 'Innocent Bizimana',
-            'email'    => 'i.bizimana@market.rw',
-            'phone'    => '+250788000012',
-            'password' => Hash::make('password'),
-            'role'     => 'inspector',
-        ]);
-
-        // Vendors
+        // ── Vendors ──────────────────────────────────────────────
         $vendors = [
-            ['Esperance Nyirabeza', 'e.nyirabeza@market.rw', '+250788100001'],
-            ['Theophile Ndayishimiye', 't.ndayishimiye@market.rw', '+250788100002'],
-            ['Marie Claire Uwase', 'm.uwase@market.rw', '+250788100003'],
-            ['Emmanuel Hakizimana', 'e.hakizimana@market.rw', '+250788100004'],
-            ['Violette Mukansanga', 'v.mukansanga@market.rw', '+250788100005'],
-            ['Joseph Nkurunziza', 'j.nkurunziza@market.rw', '+250788100006'],
-            ['Beatrice Ingabire', 'b.ingabire@market.rw', '+250788100007'],
-            ['Alexis Niyomugabo', 'a.niyomugabo@market.rw', '+250788100008'],
-            ['Chantal Mukamurenzi', 'c.mukamurenzi@market.rw', '+250788100009'],
-            ['Leon Uwimana', 'l.uwimana@market.rw', '+250788100010'],
-            ['Solange Nyiramana', 's.nyiramana@market.rw', '+250788100011'],
-            ['Claude Bizumuremyi', 'c.bizumuremyi@market.rw', '+250788100012'],
+            ['Esperance Nyirabeza',      'esperance@nyarugenge.rw',  '+250788100001', 'Vegetables & Fruits'],
+            ['Theophile Ndayishimiye',   'theophile@nyarugenge.rw',  '+250788100002', 'Meat & Poultry'],
+            ['Marie Claire Uwase',       'marie@nyarugenge.rw',      '+250788100003', 'Dairy Products'],
+            ['Emmanuel Hakizimana',      'emmanuel@nyarugenge.rw',   '+250788100004', 'Fish & Seafood'],
+            ['Violette Mukansanga',      'violette@nyarugenge.rw',   '+250788100005', 'Grains & Cereals'],
+            ['Joseph Nkurunziza',        'joseph@nyarugenge.rw',     '+250788100006', 'Spices & Condiments'],
+            ['Beatrice Ingabire',        'beatrice@nyarugenge.rw',   '+250788100007', 'Bakery & Pastry'],
+            ['Alexis Niyomugabo',        'alexis@nyarugenge.rw',     '+250788100008', 'General Goods'],
         ];
 
-        foreach ($vendors as [$name, $email, $phone]) {
+        foreach ($vendors as [$name, $email, $phone, $category]) {
             User::create([
                 'name'     => $name,
                 'email'    => $email,

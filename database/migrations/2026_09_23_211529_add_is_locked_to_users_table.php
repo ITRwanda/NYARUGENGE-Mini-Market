@@ -9,19 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->string('phone')->nullable()->after('email');
-            $table->enum('role', [
-                'admin',
-                'inspector',
-                'vendor',
-            ])->default('vendor')->after('phone');
+            $table->boolean('is_locked')->default(false)->after('role');
         });
     }
 
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn(['phone', 'role']);
+            $table->dropColumn('is_locked');
         });
     }
 };

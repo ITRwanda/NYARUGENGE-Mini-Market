@@ -124,8 +124,9 @@
     </div>
 
     <div class="flex gap-3 justify-end">
+        @php $isAdmin = auth()->user()->isAdmin(); @endphp
         <a href="{{ route('admin.inspections') }}" class="btn-secondary">Back to list</a>
-        @if(auth()->user()->isAdmin() || auth()->user()->isMarketAdmin() || auth()->user()->isInspector())
+        @if(!$isAdmin && $inspection->inspector_id === auth()->id())
         <a href="{{ route('admin.inspections.edit', $inspection) }}" class="btn-primary">
             <i data-feather="edit-2" class="w-4 h-4"></i>
             Edit Inspection

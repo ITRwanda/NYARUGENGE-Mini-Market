@@ -32,7 +32,15 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        // Every role lands on the same dashboard — the view adapts by role
+        // Block locked accounts
+        if (Auth::user()->is_locked) {
+            Auth::logout();
+            $request->session()->invalidate();
+            return back()->withErrors([
+                'email' => 'This account has been locked. Please contact the administrator.',
+            ])->onlyInput('email');
+        }
+
         return redirect()->intended(route('admin.dashboard'));
     }
 
