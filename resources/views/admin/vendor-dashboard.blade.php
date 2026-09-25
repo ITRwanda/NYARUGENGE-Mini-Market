@@ -4,6 +4,48 @@
 
 @section('content')
 
+@php
+    $tempTh = $thresholds['temperature'] ?? null;
+    $humTh  = $thresholds['humidity']    ?? null;
+    $gasTh  = $thresholds['gas_level']   ?? null;
+
+    // Check the single most recent reading across vendor's devices for live breach
+    $latestVendorReading = $latestReadings->sortByDesc('recorded_at')->first();
+    $dashBreaches = [];
+    if ($latestVendorReading) {
+        if ($gasTh && $gasTh->maximum_value !== null && $latestVendorReading->gas_level !== null && $latestVendorReading->gas_level > $gasTh->maximum_value)
+            $dashBreaches[] = '💨 Gas level ' . $latestVendorReading->gas_level . ' ppm exceeds max ' . $gasTh->maximum_value . ' ppm';
+        if ($tempTh && $tempTh->maximum_value !== null && $latestVendorReading->temperature !== null && $latestVendorReading->temperature > $tempTh->maximum_value)
+            $dashBreaches[] = '🌡️ Temperature ' . $latestVendorReading->temperature . '°C exceeds max ' . $tempTh->maximum_value . '°C';
+        if ($tempTh && $tempTh->minimum_value !== null && $latestVendorReading->temperature !== null && $latestVendorReading->temperature < $tempTh->minimum_value)
+            $dashBreaches[] = '🌡️ Temperature ' . $latestVendorReading->temperature . '°C is below min ' . $tempTh->minimum_value . '°C';
+        if ($humTh && $humTh->maximum_value !== null && $latestVendorReading->humidity !== null && $latestVendorReading->humidity > $humTh->maximum_value)
+            $dashBreaches[] = '💧 Humidity ' . $latestVendorReading->humidity . '% exceeds max ' . $humTh->maximum_value . '%';
+        if ($humTh && $humTh->minimum_value !== null && $latestVendorReading->humidity !== null && $latestVendorReading->humidity < $humTh->minimum_value)
+            $dashBreaches[] = '💧 Humidity ' . $latestVendorReading->humidity . '% is below min ' . $humTh->minimum_value . '%';
+    }
+@endphp
+
+{{-- ⚠️ Live breach banner --}}
+@if(count($dashBreaches) > 0)
+<div class="mb-5 p-4 bg-red-50 border border-red-300 rounded-2xl flex items-start gap-3">
+    <i data-feather="alert-triangle" class="w-5 h-5 shrink-0 text-red-500 mt-0.5"></i>
+    <div>
+        <p class="text-sm font-bold text-red-700 mb-1">⚠️ Threshold Breach on Your Stall!</p>
+        <ul class="text-sm text-red-700 space-y-0.5 list-disc list-inside">
+            @foreach($dashBreaches as $b)
+                <li>{{ $b }}</li>
+            @endforeach
+        </ul>
+        <p class="text-xs text-red-500 mt-1.5">
+            Stall {{ $latestVendorReading->stall?->stall_number }} &bull;
+            {{ $latestVendorReading->recorded_at?->diffForHumans() }} &bull;
+            <a href="{{ route('admin.my-alerts') }}" class="underline font-semibold">View your alerts →</a>
+        </p>
+    </div>
+</div>
+@endif
+
 {{-- Vendor identity banner --}}
 <div class="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm mb-6 flex items-center gap-5">
     <div class="w-14 h-14 rounded-2xl bg-green-600 flex items-center justify-center text-white font-extrabold text-xl shrink-0">

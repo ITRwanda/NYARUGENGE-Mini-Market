@@ -79,7 +79,7 @@
                 <x-nav-link route="admin.my-readings"    icon="activity"  label="Sensor Data" />
                 <x-nav-link route="admin.my-inspections" icon="clipboard" label="Inspection Results" />
                 <x-nav-link-badge route="admin.my-alerts" icon="bell" label="My Alerts"
-                    :count="\App\Models\Alert::whereIn('stall_id', auth()->user()->vendor?->stalls?->pluck('id') ?? [])->where('status','open')->count()" />
+                    :count="\App\Models\Alert::whereIn('stall_id', auth()->user()->vendor?->load('stalls')->stalls->pluck('id') ?? collect())->where('status','open')->count()" />
             @endif
 
         </nav>

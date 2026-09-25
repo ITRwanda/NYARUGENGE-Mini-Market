@@ -71,17 +71,17 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::put('/thresholds/{threshold}',      [MarketAdminController::class, 'updateThreshold'])->name('thresholds.update');
         Route::delete('/thresholds/{threshold}',   [MarketAdminController::class, 'destroyThreshold'])->name('thresholds.destroy');
 
-        // Inspector management
-        Route::get('/inspectors',                      [UserManagementController::class, 'index'])->name('users');
-        Route::get('/inspectors/create',               [UserManagementController::class, 'create'])->name('users.create');
-        Route::post('/inspectors',                     [UserManagementController::class, 'store'])->name('users.store');
-        Route::get('/inspectors/{user}/edit',          [UserManagementController::class, 'edit'])->name('users.edit');
-        Route::put('/inspectors/{user}',               [UserManagementController::class, 'update'])->name('users.update');
-        Route::patch('/inspectors/{user}/lock',        [UserManagementController::class, 'lock'])->name('users.lock');
-        Route::patch('/inspectors/{user}/unlock',      [UserManagementController::class, 'unlock'])->name('users.unlock');
-        Route::delete('/inspectors/{user}',            [UserManagementController::class, 'destroy'])->name('users.destroy');
-        Route::get('/inspectors/{user}/assign-stalls', [UserManagementController::class, 'assignStalls'])->name('users.assign-stalls');
-        Route::post('/inspectors/{user}/assign-stalls',[UserManagementController::class, 'saveStalls'])->name('users.save-stalls');
+        // User management — inspectors AND vendors
+        Route::get('/users',                           [UserManagementController::class, 'index'])->name('users');
+        Route::get('/users/create',                    [UserManagementController::class, 'create'])->name('users.create');
+        Route::post('/users',                          [UserManagementController::class, 'store'])->name('users.store');
+        Route::get('/users/{user}/edit',               [UserManagementController::class, 'edit'])->name('users.edit');
+        Route::put('/users/{user}',                    [UserManagementController::class, 'update'])->name('users.update');
+        Route::patch('/users/{user}/lock',             [UserManagementController::class, 'lock'])->name('users.lock');
+        Route::patch('/users/{user}/unlock',           [UserManagementController::class, 'unlock'])->name('users.unlock');
+        Route::delete('/users/{user}',                 [UserManagementController::class, 'destroy'])->name('users.destroy');
+        Route::get('/users/{user}/assign-stalls',      [UserManagementController::class, 'assignStalls'])->name('users.assign-stalls');
+        Route::post('/users/{user}/assign-stalls',     [UserManagementController::class, 'saveStalls'])->name('users.save-stalls');
     });
 
     /*── Admin + Inspector — SHARED route names ─────────────────

@@ -109,18 +109,17 @@ class MarketAdminController extends Controller
 
     public function createVendor()
     {
-        $market = $this->getMarket();
-        $users  = User::where('role', 'vendor')->orderBy('name')->get();
+        $markets = Market::where('is_active', true)->orderBy('name')->get();
+        $users   = User::where('role', 'vendor')->orderBy('name')->get();
 
-        return view('admin.vendors.create', compact('market', 'users'));
+        return view('admin.vendors.create', compact('markets', 'users'));
     }
 
     public function storeVendor(Request $request)
     {
-        $market = $this->getMarket();
-
         $data = $request->validate([
             'user_id'       => 'nullable|exists:users,id',
+            'market_id'     => 'required|exists:markets,id',
             'vendor_code'   => 'required|string|unique:vendors,vendor_code',
             'business_name' => 'nullable|string|max:255',
             'phone'         => 'nullable|string|max:20',
@@ -128,7 +127,6 @@ class MarketAdminController extends Controller
             'is_active'     => 'boolean',
         ]);
 
-        $data['market_id'] = $market->id;
         $data['is_active'] = $request->boolean('is_active', true);
         Vendor::create($data);
 
@@ -138,16 +136,17 @@ class MarketAdminController extends Controller
 
     public function editVendor(Vendor $vendor)
     {
-        $market = $this->getMarket();
-        $users  = User::where('role', 'vendor')->orderBy('name')->get();
+        $markets = Market::where('is_active', true)->orderBy('name')->get();
+        $users   = User::where('role', 'vendor')->orderBy('name')->get();
 
-        return view('admin.vendors.edit', compact('vendor', 'market', 'users'));
+        return view('admin.vendors.edit', compact('vendor', 'markets', 'users'));
     }
 
     public function updateVendor(Request $request, Vendor $vendor)
     {
         $data = $request->validate([
             'user_id'       => 'nullable|exists:users,id',
+            'market_id'     => 'required|exists:markets,id',
             'business_name' => 'nullable|string|max:255',
             'phone'         => 'nullable|string|max:20',
             'food_category' => 'nullable|string|max:255',
@@ -366,13 +365,14 @@ class MarketAdminController extends Controller
 
     public function createThreshold()
     {
-        $market  = $this->getMarket();
+        $markets = Market::where('is_active', true)->orderBy('name')->get();
+        $market  = $markets->first() ?? $this->getMarket();
         $devices = Device::where('market_id', $market->id)
             ->where('is_active', true)
             ->orderBy('device_name')
             ->get();
 
-        return view('admin.thresholds.create', compact('market', 'devices'));
+        return view('admin.thresholds.create', compact('markets', 'market', 'devices'));
     }
 
     public function storeThreshold(Request $request)
@@ -398,13 +398,13 @@ class MarketAdminController extends Controller
 
     public function editThreshold(Threshold $threshold)
     {
-        $market  = $this->getMarket();
-        $devices = Device::where('market_id', $market->id)
+        $markets = Market::where('is_active', true)->orderBy('name')->get();
+        $devices = Device::where('market_id', $threshold->market_id)
             ->where('is_active', true)
             ->orderBy('device_name')
             ->get();
 
-        return view('admin.thresholds.edit', compact('threshold', 'market', 'devices'));
+        return view('admin.thresholds.edit', compact('threshold', 'markets', 'devices'));
     }
 
     public function updateThreshold(Request $request, Threshold $threshold)
@@ -439,7 +439,7 @@ class MarketAdminController extends Controller
 
     public function alerts()
     {
-        $query = Alert::with(['device', 'stall']);
+        $query = Alert::with(['device', 'stall.vendor']);
 
         if (auth()->user()->isInspector()) {
             // Inspectors only see alerts for stalls they've inspected
@@ -447,10 +447,23 @@ class MarketAdminController extends Controller
                 ->pluck('stall_id')->unique();
             $query->whereIn('stall_id', $stallIds);
         }
+        // Admin sees all alerts (no additional filter)
 
         $alerts = $query->latest()->paginate(20);
 
-        return view('admin.alerts.index', compact('alerts'));
+        // Scoped stats — admin sees all, inspector sees their scope
+        $statsQuery = Alert::query();
+        if (auth()->user()->isInspector()) {
+            $stallIds = Inspection::where('inspector_id', auth()->id())
+                ->pluck('stall_id')->unique();
+            $statsQuery->whereIn('stall_id', $stallIds);
+        }
+        $openCount     = (clone $statsQuery)->where('status', 'open')->count();
+        $ackCount      = (clone $statsQuery)->where('status', 'acknowledged')->count();
+        $resolvedCount = (clone $statsQuery)->where('status', 'resolved')->count();
+        $criticalCount = (clone $statsQuery)->where('severity', 'critical')->where('status', 'open')->count();
+
+        return view('admin.alerts.index', compact('alerts', 'openCount', 'ackCount', 'resolvedCount', 'criticalCount'));
     }
 
     public function acknowledgeAlert(Alert $alert)
@@ -646,7 +659,12 @@ class MarketAdminController extends Controller
             ->latest('recorded_at')
             ->paginate(25);
 
-        return view('admin.sensor-readings.index', compact('readings', 'devices'));
+        // Load active thresholds so the view can do dynamic breach detection
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($group) => $group->first()); // one threshold per parameter (market-wide)
+
+        return view('admin.sensor-readings.index', compact('readings', 'devices', 'thresholds'));
     }
 
     /*==========================================================================
@@ -674,12 +692,16 @@ class MarketAdminController extends Controller
             });
         });
 
-        return view('admin.vendor.my-stall', compact('vendor'));
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($g) => $g->first());
+
+        return view('admin.vendor.my-stall', compact('vendor', 'thresholds'));
     }
 
     public function myAlerts()
     {
-        $vendor   = auth()->user()->vendor;
+        $vendor   = auth()->user()->vendor?->load('stalls');
         $stallIds = $vendor?->stalls->pluck('id') ?? collect();
 
         $alerts = Alert::with(['device', 'stall'])
@@ -687,7 +709,11 @@ class MarketAdminController extends Controller
             ->latest()
             ->paginate(20);
 
-        return view('admin.vendor.my-alerts', compact('alerts', 'vendor'));
+        // Total open count across ALL pages, not just current page
+        $openCount     = Alert::whereIn('stall_id', $stallIds)->where('status', 'open')->count();
+        $criticalCount = Alert::whereIn('stall_id', $stallIds)->where('status', 'open')->where('severity', 'critical')->count();
+
+        return view('admin.vendor.my-alerts', compact('alerts', 'vendor', 'openCount', 'criticalCount'));
     }
 
     public function myReadings()
@@ -700,7 +726,12 @@ class MarketAdminController extends Controller
             ->latest('recorded_at')
             ->paginate(25);
 
-        return view('admin.vendor.my-readings', compact('readings', 'vendor'));
+        // Dynamic thresholds — same as admin view
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($group) => $group->first());
+
+        return view('admin.vendor.my-readings', compact('readings', 'vendor', 'thresholds'));
     }
 
     /** Vendor sees inspection results for their own stalls */

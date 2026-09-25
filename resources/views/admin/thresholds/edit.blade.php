@@ -91,13 +91,11 @@
             </div>
 
             <div class="flex items-center justify-between pt-2 border-t border-gray-100">
-                <form method="POST" action="{{ route('admin.thresholds.destroy', $threshold) }}"
-                      onsubmit="return confirm('Delete this threshold?')">
-                    @csrf @method('DELETE')
-                    <button type="submit" class="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 font-medium px-3 py-2 rounded-lg hover:bg-red-50 transition-colors">
-                        <i data-feather="trash-2" class="w-4 h-4"></i>Delete
-                    </button>
-                </form>
+                <button type="submit" form="delete-form"
+                        onclick="return confirm('Delete this threshold?')"
+                        class="inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-800 font-medium px-3 py-2 rounded-lg hover:bg-red-50 transition-colors">
+                    <i data-feather="trash-2" class="w-4 h-4"></i>Delete
+                </button>
                 <div class="flex gap-3">
                     <a href="{{ route('admin.thresholds') }}" class="btn-secondary">Cancel</a>
                     <button type="submit" class="btn-primary">
@@ -105,6 +103,11 @@
                     </button>
                 </div>
             </div>
+        </form>
+
+        {{-- Delete form lives OUTSIDE the edit form to avoid nested-form HTML issue --}}
+        <form id="delete-form" method="POST" action="{{ route('admin.thresholds.destroy', $threshold) }}" class="hidden">
+            @csrf @method('DELETE')
         </form>
     </div>
 </div>

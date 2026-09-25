@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>{{ $label }} -- Nyarugenge Mini Market</title>
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: DejaVu Sans, sans-serif; font-size: 9pt; color: #1f2937; background: #fff; }
+    body { font-family: Arial, sans-serif; font-size: 9pt; color: #1f2937; background: #fff; }
+    @media print {
+        .no-print { display: none !important; }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
 
     /* ── Header ─────────────────────────────────── */
     .header {
@@ -299,6 +304,25 @@
     <span>Nyarugenge Mini Market — Hygiene Monitoring System &bull; Kigali, Rwanda</span>
     <span>Generated: {{ now()->format('d M Y, H:i:s') }} by {{ auth()->user()->name }}</span>
 </div>
+
+{{-- Print toolbar (hidden when printing) --}}
+<div class="no-print" style="position:fixed;top:16px;right:16px;z-index:999;display:flex;gap:8px;">
+    <button onclick="window.print()"
+            style="background:#15803d;color:white;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+        🖨️ Print / Save as PDF
+    </button>
+    <button onclick="window.close()"
+            style="background:#6b7280;color:white;border:none;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">
+        ✕ Close
+    </button>
+</div>
+
+<script>
+    // Auto-trigger print dialog after page loads
+    window.addEventListener('load', function() {
+        setTimeout(function() { window.print(); }, 600);
+    });
+</script>
 
 </div><!-- /content -->
 </body>

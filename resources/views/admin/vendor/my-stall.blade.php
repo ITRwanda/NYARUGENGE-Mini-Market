@@ -112,9 +112,21 @@
             @if($reading)
             <div class="grid grid-cols-3 gap-2 text-center">
                 @php
-                    $tempOk = $reading->temperature === null || ($reading->temperature >= 5 && $reading->temperature <= 35);
-                    $humOk  = $reading->humidity === null    || ($reading->humidity >= 20 && $reading->humidity <= 80);
-                    $gasOk  = $reading->gas_level === null   || $reading->gas_level <= 400;
+                    $tempTh = $thresholds['temperature'] ?? null;
+                    $humTh  = $thresholds['humidity']    ?? null;
+                    $gasTh  = $thresholds['gas_level']   ?? null;
+                    $tempOk = $reading->temperature === null || (
+                        ($tempTh===null||$tempTh->minimum_value===null||$reading->temperature>=$tempTh->minimum_value) &&
+                        ($tempTh===null||$tempTh->maximum_value===null||$reading->temperature<=$tempTh->maximum_value)
+                    );
+                    $humOk = $reading->humidity === null || (
+                        ($humTh===null||$humTh->minimum_value===null||$reading->humidity>=$humTh->minimum_value) &&
+                        ($humTh===null||$humTh->maximum_value===null||$reading->humidity<=$humTh->maximum_value)
+                    );
+                    $gasOk = $reading->gas_level === null || (
+                        ($gasTh===null||$gasTh->minimum_value===null||$reading->gas_level>=$gasTh->minimum_value) &&
+                        ($gasTh===null||$gasTh->maximum_value===null||$reading->gas_level<=$gasTh->maximum_value)
+                    );
                 @endphp
 
                 <div class="rounded-xl p-3 {{ !$tempOk ? 'bg-red-50 border border-red-200' : 'bg-orange-50' }}">

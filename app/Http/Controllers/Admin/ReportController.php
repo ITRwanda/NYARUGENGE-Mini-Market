@@ -4,27 +4,24 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Alert;
-use App\Models\Device;
 use App\Models\Inspection;
 use App\Models\Market;
 use App\Models\SensorReading;
 use App\Models\Stall;
-use App\Models\Vendor;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Models\Threshold;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use OpenSpout\Writer\CSV\Writer as CsvWriter;
 use OpenSpout\Common\Entity\Row;
-use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Writer\XLSX\Options as XlsxOptions;
 use OpenSpout\Writer\CSV\Options as CsvOptions;
 
 class ReportController extends Controller
 {
-    /*─────────────────────────────────────────────────────────────
-     | REPORT VIEW
-     *────────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------------
+    // REPORT VIEW
+    // ------------------------------------------------------------------
     public function index(Request $request)
     {
         $type    = $request->input('type', 'daily');
@@ -40,14 +37,20 @@ class ReportController extends Controller
             ->orderBy('stall_number')
             ->get();
 
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($g) => $g->first());
+
         return view('admin.reports.index', array_merge($data, compact(
-            'type', 'date', 'start', 'end', 'label', 'stalls', 'stallId', 'market'
+            'type', 'date', 'start', 'end', 'label', 'stalls', 'stallId', 'market', 'thresholds'
         )));
     }
 
-    /*─────────────────────────────────────────────────────────────
-     | PDF EXPORT
-     *────────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------------
+    // PDF EXPORT
+    // Opens a print-ready HTML page in the browser (no DomPDF needed).
+    // Browser print dialog -> Save as PDF.
+    // ------------------------------------------------------------------
     public function exportPdf(Request $request)
     {
         $type    = $request->input('type', 'daily');
@@ -60,18 +63,18 @@ class ReportController extends Controller
         $market = Market::where('is_active', true)->firstOrFail();
         $stall  = $stallId ? Stall::with('vendor')->find($stallId) : null;
 
-        $pdf = Pdf::loadView('admin.reports.pdf', array_merge($data, compact(
-            'type', 'start', 'end', 'label', 'market', 'stall'
-        )))->setPaper('a4', 'portrait');
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($g) => $g->first());
 
-        $filename = 'nyarugenge-report-' . $type . '-' . $start->format('Y-m-d') . '.pdf';
-
-        return $pdf->download($filename);
+        return view('admin.reports.pdf', array_merge($data, compact(
+            'type', 'start', 'end', 'label', 'market', 'stall', 'thresholds'
+        )));
     }
 
-    /*─────────────────────────────────────────────────────────────
-     | EXCEL EXPORT  (.xlsx)
-     *────────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------------
+    // EXCEL EXPORT (.xlsx)  -- OpenSpout v4
+    // ------------------------------------------------------------------
     public function exportExcel(Request $request)
     {
         $type    = $request->input('type', 'daily');
@@ -81,27 +84,31 @@ class ReportController extends Controller
         [$start, $end, $label] = $this->resolvePeriod($type, $date);
         $data = $this->buildReport($start, $end, $stallId);
 
-        $filename  = 'nyarugenge-report-' . $type . '-' . $start->format('Y-m-d') . '.xlsx';
-        $tmpPath   = tempnam(sys_get_temp_dir(), 'xlsx_') . '.xlsx';
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($g) => $g->first());
+
+        $filename = 'nyarugenge-report-' . $type . '-' . $start->format('Y-m-d') . '.xlsx';
+        $tmpPath  = tempnam(sys_get_temp_dir(), 'xlsx_') . '.xlsx';
 
         $options = new XlsxOptions();
         $writer  = new XlsxWriter($options);
         $writer->openToFile($tmpPath);
 
-        // ── Summary sheet ──────────────────────────────────────
+        // -- Summary sheet --
         $writer->getCurrentSheet()->setName('Summary');
-        $this->xlsxRow($writer, ['Nyarugenge Mini Market — ' . $label . ' Report'], true);
-        $this->xlsxRow($writer, ['Period', $start->format('d M Y') . ' – ' . $end->format('d M Y')]);
+        $this->xlsxRow($writer, ['Nyarugenge Mini Market - ' . $label]);
+        $this->xlsxRow($writer, ['Period', $start->format('d M Y') . ' to ' . $end->format('d M Y')]);
         $this->xlsxRow($writer, ['Generated at', now()->format('d M Y H:i:s')]);
         $this->xlsxRow($writer, ['Generated by', auth()->user()->name]);
         $this->xlsxRow($writer, []);
-        $this->xlsxRow($writer, ['SUMMARY'], true);
+        $this->xlsxRow($writer, ['SUMMARY']);
         $this->xlsxRow($writer, ['Total Sensor Readings', $data['summary']['total_readings']]);
-        $this->xlsxRow($writer, ['Avg Temperature (°C)',  $data['summary']['avg_temp']]);
+        $this->xlsxRow($writer, ['Avg Temperature (C)',   $data['summary']['avg_temp']]);
         $this->xlsxRow($writer, ['Avg Humidity (%)',      $data['summary']['avg_humidity']]);
         $this->xlsxRow($writer, ['Avg Gas Level (ppm)',   $data['summary']['avg_gas']]);
-        $this->xlsxRow($writer, ['Max Temperature (°C)',  $data['summary']['max_temp']]);
-        $this->xlsxRow($writer, ['Min Temperature (°C)',  $data['summary']['min_temp']]);
+        $this->xlsxRow($writer, ['Max Temperature (C)',   $data['summary']['max_temp']]);
+        $this->xlsxRow($writer, ['Min Temperature (C)',   $data['summary']['min_temp']]);
         $this->xlsxRow($writer, ['Total Alerts',          $data['summary']['total_alerts']]);
         $this->xlsxRow($writer, ['Open Alerts',           $data['summary']['open_alerts']]);
         $this->xlsxRow($writer, ['Critical Alerts',       $data['summary']['critical_alerts']]);
@@ -109,44 +116,58 @@ class ReportController extends Controller
         $this->xlsxRow($writer, ['Completed Inspections', $data['summary']['completed_inspections']]);
         $this->xlsxRow($writer, ['Avg Pass Rate (%)',     $data['summary']['avg_pass_rate']]);
 
-        // ── Sensor readings sheet ──────────────────────────────
+        // -- Sensor readings sheet --
         $writer->addNewSheetAndMakeItCurrent()->setName('Sensor Readings');
-        $this->xlsxRow($writer, ['Time', 'Device', 'Stall', 'Temperature (°C)', 'Humidity (%)', 'Gas Level (ppm)', 'Health'], true);
+        $this->xlsxRow($writer, ['Time', 'Device', 'Stall', 'Temperature (C)', 'Humidity (%)', 'Gas (ppm)', 'Health']);
+
+        $tempTh = $thresholds['temperature'] ?? null;
+        $humTh  = $thresholds['humidity']    ?? null;
+        $gasTh  = $thresholds['gas_level']   ?? null;
+
         foreach ($data['readings'] as $r) {
-            $tempOk = $r->temperature === null || ($r->temperature >= 5 && $r->temperature <= 35);
-            $humOk  = $r->humidity === null   || ($r->humidity >= 20 && $r->humidity <= 80);
-            $gasOk  = $r->gas_level === null  || $r->gas_level <= 400;
+            $tOk = $r->temperature === null || (
+                ($tempTh === null || $tempTh->minimum_value === null || $r->temperature >= $tempTh->minimum_value) &&
+                ($tempTh === null || $tempTh->maximum_value === null || $r->temperature <= $tempTh->maximum_value)
+            );
+            $hOk = $r->humidity === null || (
+                ($humTh === null || $humTh->minimum_value === null || $r->humidity >= $humTh->minimum_value) &&
+                ($humTh === null || $humTh->maximum_value === null || $r->humidity <= $humTh->maximum_value)
+            );
+            $gOk = $r->gas_level === null || (
+                ($gasTh === null || $gasTh->minimum_value === null || $r->gas_level >= $gasTh->minimum_value) &&
+                ($gasTh === null || $gasTh->maximum_value === null || $r->gas_level <= $gasTh->maximum_value)
+            );
             $this->xlsxRow($writer, [
-                $r->recorded_at?->format('d/m/Y H:i'),
-                $r->device?->device_name ?? '—',
-                $r->stall?->stall_number ?? '—',
-                $r->temperature,
-                $r->humidity,
-                $r->gas_level,
-                ($tempOk && $humOk && $gasOk) ? 'Normal' : 'Breach',
+                $r->recorded_at?->format('d/m/Y H:i') ?? '',
+                $r->device?->device_name ?? '',
+                $r->stall?->stall_number ?? '',
+                (string) ($r->temperature ?? ''),
+                (string) ($r->humidity ?? ''),
+                (string) ($r->gas_level ?? ''),
+                ($tOk && $hOk && $gOk) ? 'Normal' : 'Breach',
             ]);
         }
 
-        // ── Alerts sheet ───────────────────────────────────────
+        // -- Alerts sheet --
         $writer->addNewSheetAndMakeItCurrent()->setName('Alerts');
-        $this->xlsxRow($writer, ['Time', 'Device', 'Stall', 'Parameter', 'Measured', 'Threshold', 'Severity', 'Status', 'Message'], true);
+        $this->xlsxRow($writer, ['Time', 'Device', 'Stall', 'Parameter', 'Measured', 'Threshold', 'Severity', 'Status', 'Message']);
         foreach ($data['alerts'] as $a) {
             $this->xlsxRow($writer, [
                 $a->created_at->format('d/m/Y H:i'),
-                $a->device?->device_name ?? '—',
-                $a->stall?->stall_number ?? '—',
+                $a->device?->device_name ?? '',
+                $a->stall?->stall_number ?? '',
                 ucfirst(str_replace('_', ' ', $a->parameter)),
-                $a->measured_value,
-                $a->threshold_value ?? '—',
+                (string) ($a->measured_value ?? ''),
+                (string) ($a->threshold_value ?? ''),
                 ucfirst($a->severity),
                 ucfirst($a->status),
-                $a->message,
+                $a->message ?? '',
             ]);
         }
 
-        // ── Inspections sheet ──────────────────────────────────
+        // -- Inspections sheet --
         $writer->addNewSheetAndMakeItCurrent()->setName('Inspections');
-        $this->xlsxRow($writer, ['Date', 'Stall', 'Inspector', 'Items', 'Passed', 'Failed', 'Pass Rate (%)', 'Status', 'Notes'], true);
+        $this->xlsxRow($writer, ['Date', 'Stall', 'Inspector', 'Items', 'Passed', 'Failed', 'Pass Rate (%)', 'Status', 'Notes']);
         foreach ($data['inspections'] as $ins) {
             $total  = $ins->items->count();
             $passed = $ins->items->where('status', 'pass')->count();
@@ -154,8 +175,8 @@ class ReportController extends Controller
             $rate   = $total > 0 ? round(($passed / $total) * 100, 1) : 0;
             $this->xlsxRow($writer, [
                 $ins->inspection_date->format('d/m/Y'),
-                $ins->stall?->stall_number ?? '—',
-                $ins->inspector?->name ?? '—',
+                $ins->stall?->stall_number ?? '',
+                $ins->inspector?->name ?? '',
                 $total, $passed, $failed, $rate,
                 ucfirst(str_replace('_', ' ', $ins->status)),
                 $ins->general_notes ?? '',
@@ -169,18 +190,22 @@ class ReportController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    /*─────────────────────────────────────────────────────────────
-     | CSV EXPORT
-     *────────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------------
+    // CSV EXPORT -- OpenSpout v4
+    // ------------------------------------------------------------------
     public function exportCsv(Request $request)
     {
         $type    = $request->input('type', 'daily');
         $date    = $request->input('date', today()->toDateString());
         $stallId = $request->input('stall_id');
-        $sheet   = $request->input('sheet', 'readings'); // readings|alerts|inspections
+        $sheet   = $request->input('sheet', 'readings');
 
         [$start, $end] = $this->resolvePeriod($type, $date);
         $data = $this->buildReport($start, $end, $stallId);
+
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($g) => $g->first());
 
         $filename = 'nyarugenge-' . $sheet . '-' . $start->format('Y-m-d') . '.csv';
         $tmpPath  = tempnam(sys_get_temp_dir(), 'csv_') . '.csv';
@@ -190,9 +215,9 @@ class ReportController extends Controller
         $writer->openToFile($tmpPath);
 
         match ($sheet) {
-            'alerts' => $this->writeCsvAlerts($writer, $data['alerts']),
+            'alerts'      => $this->writeCsvAlerts($writer, $data['alerts']),
             'inspections' => $this->writeCsvInspections($writer, $data['inspections']),
-            default => $this->writeCsvReadings($writer, $data['readings']),
+            default       => $this->writeCsvReadings($writer, $data['readings'], $thresholds),
         };
 
         $writer->close();
@@ -202,41 +227,42 @@ class ReportController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    /*─────────────────────────────────────────────────────────────
-     | HELPERS
-     *────────────────────────────────────────────────────────────*/
+    // ------------------------------------------------------------------
+    // PRIVATE: resolvePeriod
+    // ------------------------------------------------------------------
     private function resolvePeriod(string $type, string $date): array
     {
         return match ($type) {
-            'weekly'  => [
+            'weekly' => [
                 Carbon::parse($date)->startOfWeek(),
                 Carbon::parse($date)->endOfWeek(),
-                'Weekly Report — w/c ' . Carbon::parse($date)->startOfWeek()->format('d M Y'),
+                'Weekly Report - w/c ' . Carbon::parse($date)->startOfWeek()->format('d M Y'),
             ],
             'monthly' => [
                 Carbon::parse($date)->startOfMonth(),
                 Carbon::parse($date)->endOfMonth(),
-                'Monthly Report — ' . Carbon::parse($date)->format('F Y'),
+                'Monthly Report - ' . Carbon::parse($date)->format('F Y'),
             ],
             default => [
                 Carbon::parse($date)->startOfDay(),
                 Carbon::parse($date)->endOfDay(),
-                'Daily Report — ' . Carbon::parse($date)->format('d M Y'),
+                'Daily Report - ' . Carbon::parse($date)->format('d M Y'),
             ],
         };
     }
 
+    // ------------------------------------------------------------------
+    // PRIVATE: buildReport
+    // ------------------------------------------------------------------
     private function buildReport(Carbon $start, Carbon $end, ?int $stallId): array
     {
-        // Base queries
-        $readingQ    = SensorReading::with(['device', 'stall'])
+        $readingQ = SensorReading::with(['device', 'stall'])
             ->whereBetween('recorded_at', [$start, $end]);
-        $alertQ      = Alert::with(['device', 'stall'])
+        $alertQ = Alert::with(['device', 'stall'])
             ->whereBetween('created_at', [$start, $end]);
         $inspectionQ = Inspection::with(['stall', 'inspector', 'items'])
             ->whereBetween('inspection_date', [$start, $end]);
 
-        // Filter by stall if requested
         if ($stallId) {
             $readingQ->where('stall_id', $stallId);
             $alertQ->where('stall_id', $stallId);
@@ -247,41 +273,42 @@ class ReportController extends Controller
         $alerts      = $alertQ->latest()->get();
         $inspections = $inspectionQ->latest('inspection_date')->get();
 
-        // Pass rate
-        $allItems  = $inspections->flatMap(fn ($i) => $i->items);
-        $totalItems = $allItems->count();
+        $allItems    = $inspections->flatMap(fn ($i) => $i->items);
+        $totalItems  = $allItems->count();
         $passedItems = $allItems->where('status', 'pass')->count();
         $avgPassRate = $totalItems > 0 ? round(($passedItems / $totalItems) * 100, 1) : 0;
 
-        // Per-stall stats
         $market     = Market::where('is_active', true)->firstOrFail();
         $stallStats = Stall::with(['vendor', 'devices'])
             ->where('market_id', $market->id)
             ->when($stallId, fn ($q) => $q->where('id', $stallId))
             ->get()
             ->map(function ($stall) use ($start, $end) {
-                $r = SensorReading::where('stall_id', $stall->id)
+                $r   = SensorReading::where('stall_id', $stall->id)
                     ->whereBetween('recorded_at', [$start, $end]);
                 $ins = Inspection::with('items')
                     ->where('stall_id', $stall->id)
-                    ->whereBetween('inspection_date', [$start, $end])->get();
-                $items   = $ins->flatMap(fn ($i) => $i->items);
-                $total   = $items->count();
-                $passed  = $items->where('status', 'pass')->count();
+                    ->whereBetween('inspection_date', [$start, $end])
+                    ->get();
+                $items  = $ins->flatMap(fn ($i) => $i->items);
+                $total  = $items->count();
+                $passed = $items->where('status', 'pass')->count();
                 return [
                     'stall'        => $stall,
                     'readings'     => (clone $r)->count(),
                     'avg_temp'     => round((clone $r)->avg('temperature') ?? 0, 1),
                     'avg_humidity' => round((clone $r)->avg('humidity') ?? 0, 1),
                     'avg_gas'      => round((clone $r)->avg('gas_level') ?? 0, 1),
-                    'alerts'       => Alert::where('stall_id', $stall->id)->whereBetween('created_at', [$start, $end])->count(),
-                    'open_alerts'  => Alert::where('stall_id', $stall->id)->whereBetween('created_at', [$start, $end])->where('status', 'open')->count(),
+                    'alerts'       => Alert::where('stall_id', $stall->id)
+                        ->whereBetween('created_at', [$start, $end])->count(),
+                    'open_alerts'  => Alert::where('stall_id', $stall->id)
+                        ->whereBetween('created_at', [$start, $end])
+                        ->where('status', 'open')->count(),
                     'inspections'  => $ins->count(),
                     'pass_rate'    => $total > 0 ? round(($passed / $total) * 100, 1) : null,
                 ];
             });
 
-        // Daily trend for chart (last 30 points max)
         $trend = collect();
         $step  = max(1, (int) $start->diffInDays($end));
         for ($i = 0; $i <= min($step, 29); $i++) {
@@ -296,27 +323,27 @@ class ReportController extends Controller
                 'humidity' => round($row->h ?? 0, 1),
                 'gas'      => round($row->g ?? 0, 1),
                 'alerts'   => Alert::whereDate('created_at', $day->toDateString())
-                                ->when($stallId, fn ($q) => $q->where('stall_id', $stallId))
-                                ->count(),
+                    ->when($stallId, fn ($q) => $q->where('stall_id', $stallId))
+                    ->count(),
             ]);
         }
 
         return [
             'summary' => [
-                'total_readings'          => $readings->count(),
-                'avg_temp'                => round($readings->avg('temperature') ?? 0, 1),
-                'avg_humidity'            => round($readings->avg('humidity') ?? 0, 1),
-                'avg_gas'                 => round($readings->avg('gas_level') ?? 0, 1),
-                'max_temp'                => round($readings->max('temperature') ?? 0, 1),
-                'min_temp'                => round($readings->min('temperature') ?? 0, 1),
-                'max_humidity'            => round($readings->max('humidity') ?? 0, 1),
-                'min_humidity'            => round($readings->min('humidity') ?? 0, 1),
-                'total_alerts'            => $alerts->count(),
-                'open_alerts'             => $alerts->where('status', 'open')->count(),
-                'critical_alerts'         => $alerts->where('severity', 'critical')->count(),
-                'total_inspections'       => $inspections->count(),
-                'completed_inspections'   => $inspections->where('status', 'completed')->count(),
-                'avg_pass_rate'           => $avgPassRate,
+                'total_readings'        => $readings->count(),
+                'avg_temp'              => round($readings->avg('temperature') ?? 0, 1),
+                'avg_humidity'          => round($readings->avg('humidity') ?? 0, 1),
+                'avg_gas'               => round($readings->avg('gas_level') ?? 0, 1),
+                'max_temp'              => round($readings->max('temperature') ?? 0, 1),
+                'min_temp'              => round($readings->min('temperature') ?? 0, 1),
+                'max_humidity'          => round($readings->max('humidity') ?? 0, 1),
+                'min_humidity'          => round($readings->min('humidity') ?? 0, 1),
+                'total_alerts'          => $alerts->count(),
+                'open_alerts'           => $alerts->where('status', 'open')->count(),
+                'critical_alerts'       => $alerts->where('severity', 'critical')->count(),
+                'total_inspections'     => $inspections->count(),
+                'completed_inspections' => $inspections->where('status', 'completed')->count(),
+                'avg_pass_rate'         => $avgPassRate,
             ],
             'readings'    => $readings,
             'alerts'      => $alerts,
@@ -326,68 +353,92 @@ class ReportController extends Controller
         ];
     }
 
-    private function xlsxRow(XlsxWriter $writer, array $values, bool $bold = false): void
+    // ------------------------------------------------------------------
+    // PRIVATE: xlsxRow  -- OpenSpout v4 uses Row::fromValues()
+    // ------------------------------------------------------------------
+    private function xlsxRow(XlsxWriter $writer, array $values): void
     {
-        $cells = array_map(fn ($v) => Cell::fromValue($v ?? ''), $values);
-        $writer->addRow(Row::fromCells($cells));
+        $writer->addRow(Row::fromValues($values));
     }
 
-    private function writeCsvReadings(CsvWriter $writer, $readings): void
+    // ------------------------------------------------------------------
+    // PRIVATE: CSV helpers
+    // ------------------------------------------------------------------
+    private function writeCsvReadings(CsvWriter $writer, $readings, $thresholds): void
     {
-        $writer->addRow(Row::fromCells(array_map(
-            fn ($v) => Cell::fromValue($v),
-            ['Time', 'Device', 'Stall', 'Temperature (°C)', 'Humidity (%)', 'Gas (ppm)', 'Health']
-        )));
+        $writer->addRow(Row::fromValues([
+            'Time', 'Device', 'Stall',
+            'Temperature (C)', 'Humidity (%)', 'Gas (ppm)', 'Health',
+        ]));
+
+        $tempTh = $thresholds['temperature'] ?? null;
+        $humTh  = $thresholds['humidity']    ?? null;
+        $gasTh  = $thresholds['gas_level']   ?? null;
+
         foreach ($readings as $r) {
-            $ok = ($r->temperature === null || ($r->temperature >= 5 && $r->temperature <= 35))
-               && ($r->humidity === null    || ($r->humidity >= 20 && $r->humidity <= 80))
-               && ($r->gas_level === null   || $r->gas_level <= 400);
-            $writer->addRow(Row::fromCells(array_map(fn ($v) => Cell::fromValue($v ?? ''), [
-                $r->recorded_at?->format('d/m/Y H:i'),
-                $r->device?->device_name ?? '—',
-                $r->stall?->stall_number ?? '—',
-                $r->temperature, $r->humidity, $r->gas_level,
-                $ok ? 'Normal' : 'Breach',
-            ])));
+            $tOk = $r->temperature === null || (
+                ($tempTh === null || $tempTh->minimum_value === null || $r->temperature >= $tempTh->minimum_value) &&
+                ($tempTh === null || $tempTh->maximum_value === null || $r->temperature <= $tempTh->maximum_value)
+            );
+            $hOk = $r->humidity === null || (
+                ($humTh === null || $humTh->minimum_value === null || $r->humidity >= $humTh->minimum_value) &&
+                ($humTh === null || $humTh->maximum_value === null || $r->humidity <= $humTh->maximum_value)
+            );
+            $gOk = $r->gas_level === null || (
+                ($gasTh === null || $gasTh->minimum_value === null || $r->gas_level >= $gasTh->minimum_value) &&
+                ($gasTh === null || $gasTh->maximum_value === null || $r->gas_level <= $gasTh->maximum_value)
+            );
+            $writer->addRow(Row::fromValues([
+                $r->recorded_at?->format('d/m/Y H:i') ?? '',
+                $r->device?->device_name ?? '',
+                $r->stall?->stall_number ?? '',
+                (string) ($r->temperature ?? ''),
+                (string) ($r->humidity ?? ''),
+                (string) ($r->gas_level ?? ''),
+                ($tOk && $hOk && $gOk) ? 'Normal' : 'Breach',
+            ]));
         }
     }
 
     private function writeCsvAlerts(CsvWriter $writer, $alerts): void
     {
-        $writer->addRow(Row::fromCells(array_map(
-            fn ($v) => Cell::fromValue($v),
-            ['Time', 'Device', 'Stall', 'Parameter', 'Measured', 'Threshold', 'Severity', 'Status', 'Message']
-        )));
+        $writer->addRow(Row::fromValues([
+            'Time', 'Device', 'Stall', 'Parameter',
+            'Measured', 'Threshold', 'Severity', 'Status', 'Message',
+        ]));
         foreach ($alerts as $a) {
-            $writer->addRow(Row::fromCells(array_map(fn ($v) => Cell::fromValue($v ?? ''), [
+            $writer->addRow(Row::fromValues([
                 $a->created_at->format('d/m/Y H:i'),
-                $a->device?->device_name ?? '—',
-                $a->stall?->stall_number ?? '—',
+                $a->device?->device_name ?? '',
+                $a->stall?->stall_number ?? '',
                 ucfirst(str_replace('_', ' ', $a->parameter)),
-                $a->measured_value, $a->threshold_value ?? '—',
-                ucfirst($a->severity), ucfirst($a->status), $a->message,
-            ])));
+                (string) ($a->measured_value ?? ''),
+                (string) ($a->threshold_value ?? ''),
+                ucfirst($a->severity),
+                ucfirst($a->status),
+                $a->message ?? '',
+            ]));
         }
     }
 
     private function writeCsvInspections(CsvWriter $writer, $inspections): void
     {
-        $writer->addRow(Row::fromCells(array_map(
-            fn ($v) => Cell::fromValue($v),
-            ['Date', 'Stall', 'Inspector', 'Items', 'Passed', 'Failed', 'Pass Rate (%)', 'Status']
-        )));
+        $writer->addRow(Row::fromValues([
+            'Date', 'Stall', 'Inspector',
+            'Items', 'Passed', 'Failed', 'Pass Rate (%)', 'Status',
+        ]));
         foreach ($inspections as $ins) {
             $total  = $ins->items->count();
             $passed = $ins->items->where('status', 'pass')->count();
             $failed = $ins->items->where('status', 'fail')->count();
-            $writer->addRow(Row::fromCells(array_map(fn ($v) => Cell::fromValue($v ?? ''), [
+            $writer->addRow(Row::fromValues([
                 $ins->inspection_date->format('d/m/Y'),
-                $ins->stall?->stall_number ?? '—',
-                $ins->inspector?->name ?? '—',
+                $ins->stall?->stall_number ?? '',
+                $ins->inspector?->name ?? '',
                 $total, $passed, $failed,
                 $total > 0 ? round(($passed / $total) * 100, 1) : 0,
                 ucfirst(str_replace('_', ' ', $ins->status)),
-            ])));
+            ]));
         }
     }
 }

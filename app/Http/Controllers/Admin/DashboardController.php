@@ -10,6 +10,7 @@ use App\Models\Market;
 use App\Models\SensorReading;
 use App\Models\Stall;
 use App\Models\Vendor;
+use App\Models\Threshold;
 use Illuminate\Support\Carbon;
 
 class DashboardController extends Controller
@@ -205,8 +206,13 @@ class DashboardController extends Controller
             ->whereIn('stall_id', $stallIds)
             ->latest()->take(6)->get();
 
+        // Active thresholds for breach detection on dashboard
+        $thresholds = Threshold::where('is_active', true)->get()
+            ->groupBy('parameter')
+            ->map(fn ($group) => $group->first());
+
         return view('admin.vendor-dashboard', compact(
-            'vendor', 'stats', 'latestReadings', 'sensorChart', 'recentAlerts'
+            'vendor', 'stats', 'latestReadings', 'sensorChart', 'recentAlerts', 'thresholds'
         ));
     }
 }

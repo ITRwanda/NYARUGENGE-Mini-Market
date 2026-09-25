@@ -273,9 +273,12 @@
             <tbody>
                 @forelse($readings->take(50) as $r)
                 @php
-                    $tOk = $r->temperature===null||($r->temperature>=5&&$r->temperature<=35);
-                    $hOk = $r->humidity===null||($r->humidity>=20&&$r->humidity<=80);
-                    $gOk = $r->gas_level===null||$r->gas_level<=400;
+                    $tempTh = $thresholds['temperature'] ?? null;
+                    $humTh  = $thresholds['humidity']    ?? null;
+                    $gasTh  = $thresholds['gas_level']   ?? null;
+                    $tOk = $r->temperature===null||(($tempTh===null||$tempTh->minimum_value===null||$r->temperature>=$tempTh->minimum_value)&&($tempTh===null||$tempTh->maximum_value===null||$r->temperature<=$tempTh->maximum_value));
+                    $hOk = $r->humidity===null||(($humTh===null||$humTh->minimum_value===null||$r->humidity>=$humTh->minimum_value)&&($humTh===null||$humTh->maximum_value===null||$r->humidity<=$humTh->maximum_value));
+                    $gOk = $r->gas_level===null||(($gasTh===null||$gasTh->minimum_value===null||$r->gas_level>=$gasTh->minimum_value)&&($gasTh===null||$gasTh->maximum_value===null||$r->gas_level<=$gasTh->maximum_value));
                     $ok  = $tOk&&$hOk&&$gOk;
                 @endphp
                 <tr>

@@ -40,16 +40,17 @@
 // ─── USER CONFIGURATION ──────────────────────────────────────
 // Change these values for each device you deploy
 
-#define WIFI_SSID        "YOUR_WIFI_SSID"       // ← your WiFi name
-#define WIFI_PASSWORD    "YOUR_WIFI_PASSWORD"    // ← your WiFi password
+#define WIFI_SSID        "Net"       // ← your WiFi name
+#define WIFI_PASSWORD    "00000000"    // ← your WiFi password
 
 // Must match a device registered in the admin dashboard
-#define DEVICE_UID       "ESP32-A1B2C3"          // ← unique per device
+#define DEVICE_UID       "ESP32-14D412"          // ← unique per device
 
 // Server URL — use your local IP when running XAMPP locally
 // e.g. "http://192.168.1.100/NYARUGENGE-Mini-Market/public/api/iot/readings"
+// For artisan serve: "http://192.168.1.102:8000/api/iot/readings"
 // For production: "https://yourdomain.rw/api/iot/readings"
-#define SERVER_URL       "http://192.168.1.83/NYARUGENGE-Mini-Market/public/api/iot/readings"
+#define SERVER_URL       "http://192.168.1.102:8000/api/iot/readings"
 
 // How often to send data (milliseconds)
 #define SEND_INTERVAL_MS  30000   // 30 seconds
@@ -58,7 +59,7 @@
 #define DHT_PIN          4        // DHT11 DATA
 #define DHT_TYPE         DHT11
 
-#define MQ135_PIN        32       // MQ-135 Analog Out (ADC1)
+#define MQ135_PIN        34       // MQ-135 Analog Out (ADC1)
 
 #define LED_GREEN        16       // Normal (all values safe)
 #define LED_YELLOW       17       // Warning (one value near limit)
@@ -69,7 +70,7 @@
 #define TEMP_MIN          5.0f    // °C
 #define HUMIDITY_MAX     80.0f    // %
 #define HUMIDITY_MIN     20.0f    // %
-#define GAS_MAX         400.0f    // ppm equivalent (raw ADC mapped)
+#define GAS_MAX         130.0f    // ppm equivalent (raw ADC mapped)
 
 // MQ-135 raw ADC → ppm mapping (linear approximation)
 // Calibrate this for your specific sensor & environment

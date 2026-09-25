@@ -8,7 +8,48 @@
     $last24 = \App\Models\SensorReading::whereIn('stall_id',
         auth()->user()->vendor?->stalls->pluck('id') ?? collect()
     )->where('recorded_at', '>=', now()->subHours(24));
+
+    // Check if the very latest reading has any breach
+    $latestReading = \App\Models\SensorReading::whereIn('stall_id',
+        auth()->user()->vendor?->stalls->pluck('id') ?? collect()
+    )->latest('recorded_at')->first();
+
+    $tempTh = $thresholds['temperature'] ?? null;
+    $humTh  = $thresholds['humidity']    ?? null;
+    $gasTh  = $thresholds['gas_level']   ?? null;
+
+    $latestBreaches = [];
+    if ($latestReading) {
+        if ($tempTh && $tempTh->maximum_value !== null && $latestReading->temperature !== null && $latestReading->temperature > $tempTh->maximum_value)
+            $latestBreaches[] = "Temperature " . $latestReading->temperature . "°C exceeds max " . $tempTh->maximum_value . "°C";
+        if ($tempTh && $tempTh->minimum_value !== null && $latestReading->temperature !== null && $latestReading->temperature < $tempTh->minimum_value)
+            $latestBreaches[] = "Temperature " . $latestReading->temperature . "°C is below min " . $tempTh->minimum_value . "°C";
+        if ($humTh && $humTh->maximum_value !== null && $latestReading->humidity !== null && $latestReading->humidity > $humTh->maximum_value)
+            $latestBreaches[] = "Humidity " . $latestReading->humidity . "% exceeds max " . $humTh->maximum_value . "%";
+        if ($humTh && $humTh->minimum_value !== null && $latestReading->humidity !== null && $latestReading->humidity < $humTh->minimum_value)
+            $latestBreaches[] = "Humidity " . $latestReading->humidity . "% is below min " . $humTh->minimum_value . "%";
+        if ($gasTh && $gasTh->maximum_value !== null && $latestReading->gas_level !== null && $latestReading->gas_level > $gasTh->maximum_value)
+            $latestBreaches[] = "Gas level " . $latestReading->gas_level . " ppm exceeds max " . $gasTh->maximum_value . " ppm";
+        if ($gasTh && $gasTh->minimum_value !== null && $latestReading->gas_level !== null && $latestReading->gas_level < $gasTh->minimum_value)
+            $latestBreaches[] = "Gas level " . $latestReading->gas_level . " ppm is below min " . $gasTh->minimum_value . " ppm";
+    }
 @endphp
+
+{{-- ⚠️ Live breach banner — shown when the latest reading exceeds a threshold --}}
+@if(count($latestBreaches) > 0)
+<div class="mb-5 p-4 bg-red-50 border border-red-300 rounded-2xl flex items-start gap-3 text-red-700 animate-pulse">
+    <i data-feather="alert-triangle" class="w-5 h-5 shrink-0 text-red-500 mt-0.5"></i>
+    <div>
+        <p class="text-sm font-bold mb-1">⚠️ Sensor Threshold Breach Detected on Your Stall!</p>
+        <ul class="text-sm space-y-0.5 list-disc list-inside">
+            @foreach($latestBreaches as $breach)
+                <li>{{ $breach }}</li>
+            @endforeach
+        </ul>
+        <p class="text-xs text-red-500 mt-1.5">Last reading: {{ $latestReading->recorded_at?->diffForHumans() }} — Contact your market admin immediately.</p>
+    </div>
+</div>
+@endif
 
 {{-- 24h averages --}}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -74,19 +115,51 @@
                     <th>Time</th>
                     <th>Device</th>
                     <th>Stall</th>
-                    <th>Temperature</th>
-                    <th>Humidity</th>
-                    <th>Gas Level</th>
+                    <th>Temperature
+                        @if(!empty($thresholds['temperature']))
+                            <span class="block text-xs font-normal text-gray-400">
+                                {{ $thresholds['temperature']->minimum_value ?? '—' }} – {{ $thresholds['temperature']->maximum_value ?? '—' }} {{ $thresholds['temperature']->unit ?? '' }}
+                            </span>
+                        @endif
+                    </th>
+                    <th>Humidity
+                        @if(!empty($thresholds['humidity']))
+                            <span class="block text-xs font-normal text-gray-400">
+                                {{ $thresholds['humidity']->minimum_value ?? '—' }} – {{ $thresholds['humidity']->maximum_value ?? '—' }} {{ $thresholds['humidity']->unit ?? '' }}
+                            </span>
+                        @endif
+                    </th>
+                    <th>Gas Level
+                        @if(!empty($thresholds['gas_level']))
+                            <span class="block text-xs font-normal text-gray-400">
+                                max {{ $thresholds['gas_level']->maximum_value ?? '—' }} {{ $thresholds['gas_level']->unit ?? '' }}
+                            </span>
+                        @endif
+                    </th>
                     <th>Health</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($readings as $reading)
                 @php
-                    $tempOk = $reading->temperature === null || ($reading->temperature >= 5 && $reading->temperature <= 35);
-                    $humOk  = $reading->humidity === null   || ($reading->humidity >= 20 && $reading->humidity <= 80);
-                    $gasOk  = $reading->gas_level === null  || $reading->gas_level <= 400;
-                    $allOk  = $tempOk && $humOk && $gasOk;
+                    // Dynamic threshold checks — uses configured limits, not hardcoded values
+                    $tempTh = $thresholds['temperature'] ?? null;
+                    $humTh  = $thresholds['humidity']    ?? null;
+                    $gasTh  = $thresholds['gas_level']   ?? null;
+
+                    $tempOk = $reading->temperature === null || (
+                        ($tempTh === null || $tempTh->minimum_value === null || $reading->temperature >= $tempTh->minimum_value) &&
+                        ($tempTh === null || $tempTh->maximum_value === null || $reading->temperature <= $tempTh->maximum_value)
+                    );
+                    $humOk = $reading->humidity === null || (
+                        ($humTh === null || $humTh->minimum_value === null || $reading->humidity >= $humTh->minimum_value) &&
+                        ($humTh === null || $humTh->maximum_value === null || $reading->humidity <= $humTh->maximum_value)
+                    );
+                    $gasOk = $reading->gas_level === null || (
+                        ($gasTh === null || $gasTh->minimum_value === null || $reading->gas_level >= $gasTh->minimum_value) &&
+                        ($gasTh === null || $gasTh->maximum_value === null || $reading->gas_level <= $gasTh->maximum_value)
+                    );
+                    $allOk = $tempOk && $humOk && $gasOk;
                 @endphp
                 <tr>
                     <td class="whitespace-nowrap">

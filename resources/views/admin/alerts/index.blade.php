@@ -5,11 +5,20 @@
 @section('content')
 
 @php
-    $openCount     = \App\Models\Alert::where('status','open')->count();
-    $ackCount      = \App\Models\Alert::where('status','acknowledged')->count();
-    $resolvedCount = \App\Models\Alert::where('status','resolved')->count();
-    $criticalCount = \App\Models\Alert::where('severity','critical')->where('status','open')->count();
+    // Stats are passed from controller — scoped correctly per role
+    // (admin sees all, inspector sees their stalls only)
 @endphp
+
+{{-- Critical alert banner --}}
+@if($criticalCount > 0)
+<div class="mb-5 p-4 bg-red-50 border border-red-300 rounded-2xl flex items-start gap-3">
+    <i data-feather="alert-octagon" class="w-5 h-5 shrink-0 text-red-500 mt-0.5"></i>
+    <div>
+        <p class="text-sm font-bold text-red-700">{{ $criticalCount }} critical threshold breach{{ $criticalCount !== 1 ? 'es' : '' }} require immediate action</p>
+        <p class="text-xs text-red-500 mt-0.5">Sensor readings have exceeded configured safety limits.</p>
+    </div>
+</div>
+@endif
 
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="bg-red-50 rounded-2xl p-4 border border-red-100 text-center">
@@ -42,7 +51,7 @@
                 <tr>
                     <th>Time</th>
                     <th>Device</th>
-                    <th>Stall</th>
+                    <th>Stall / Vendor</th>
                     <th>Parameter</th>
                     <th>Measured</th>
                     <th>Threshold</th>
@@ -62,15 +71,21 @@
                         <span class="text-xs font-bold bg-green-50 text-green-800 px-2 py-0.5 rounded-lg">
                             {{ $alert->stall?->stall_number ?? '—' }}
                         </span>
+                        @if($alert->stall?->vendor)
+                            <p class="text-xs text-gray-400 mt-0.5">{{ $alert->stall->vendor->business_name }}</p>
+                        @endif
                     </td>
                     <td>
-                        @php $icons = ['temperature'=>'🌡','humidity'=>'💧','gas_level'=>'💨']; @endphp
+                        @php $icons = ['temperature'=>'🌡️','humidity'=>'💧','gas_level'=>'💨']; @endphp
                         <span class="text-sm">{{ ($icons[$alert->parameter] ?? '📊') }} {{ ucfirst(str_replace('_',' ',$alert->parameter)) }}</span>
                     </td>
                     <td class="font-mono font-bold text-sm {{ $alert->severity === 'critical' ? 'text-red-600' : 'text-orange-500' }}">
-                        {{ $alert->measured_value }}
+                        @php
+                            $unit = match($alert->parameter) { 'temperature'=>'°C', 'humidity'=>'%', 'gas_level'=>' ppm', default=>'' };
+                        @endphp
+                        {{ $alert->measured_value }}{{ $unit }}
                     </td>
-                    <td class="font-mono text-gray-500 text-xs">{{ $alert->threshold_value ?? '—' }}</td>
+                    <td class="font-mono text-gray-500 text-xs">{{ $alert->threshold_value ?? '—' }}{{ $alert->threshold_value ? $unit : '' }}</td>
                     <td>
                         @if($alert->severity === 'critical') <span class="badge badge-red">🔴 Critical</span>
                         @elseif($alert->severity === 'warning') <span class="badge badge-yellow">⚠️ Warning</span>
